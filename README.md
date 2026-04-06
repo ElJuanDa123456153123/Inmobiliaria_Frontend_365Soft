@@ -19,275 +19,35 @@ Frontend de la plataforma inmobiliaria boliviana. Interfaz responsiva con búsqu
 
 - **Node.js** 20+
 - **npm** 10+ o **pnpm** 9+
-- Backend corriendo en `http://localhost:8080`
+- Backend corriendo en `http://localhost:3001`
+- Opcional: Docker + Docker Compose (para PostgreSQL + Redis)
 
-## 🆕 Guía de Instalación desde Cero (Sin Plantillas)
-
-Si quieres crear el proyecto desde cero sin usar plantillas, sigue estos pasos basados en la documentación oficial de cada tecnología.
-
-### 1. Instalar Node.js y npm
-
-**Documentación oficial:** https://nodejs.org/
-
-**Windows:**
-```bash
-# Descargar instalador desde https://nodejs.org/ (versión LTS 20+)
-# O usar Chocolatey
-choco install nodejs-lts
-```
-
-**Linux (Ubuntu/Debian):**
-```bash
-# Usar NodeSource para obtener Node.js 20+
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Verificar versiones
-node --version  # debe ser v20+
-npm --version   # debe ser 10+
-```
-
-**macOS:**
-```bash
-# Usar Homebrew
-brew install node
-```
-
-### 2. Crear proyecto Next.js (App Router)
-
-**Documentación oficial:** https://nextjs.org/docs/getting-started/installation
+## 🔧 Crear desde Cero
 
 ```bash
-# Crear carpeta del proyecto
-mkdir inmobiliaria-frontend
-cd inmobiliaria-frontend
+# 1. Crear proyecto Next.js
+npx create-next-app@latest . --typescript --tailwind --eslint --app
 
-# Inicializar package.json
-npm init -y
+# 2. Inicializar shadcn/ui
+npx shadcn@latest init
 
-# Instalar Next.js, React y TypeScript
-npm install next@latest react@latest react-dom@latest
-npm install -D typescript @types/react @types/node @types/react-dom
-
-# Configurar TypeScript
-# Crear tsconfig.json según documentación: https://nextjs.org/docs/app/building-your-application/configuring/typescript
-```
-
-**Estructura mínima de carpetas Next.js:**
-```bash
-mkdir -p app components lib types public
-```
-
-**Archivo `tsconfig.json`:**
-```json
-{
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./*"]
-    }
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
-}
-```
-
-**Configurar scripts en `package.json`:**
-```json
-{
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "type-check": "tsc --noEmit"
-  }
-}
-```
-
-### 3. Configurar Tailwind CSS
-
-**Documentación oficial:** https://tailwindcss.com/docs/guides/nextjs
-
-```bash
-# Instalar Tailwind CSS
-npm install -D tailwindcss postcss autoprefixer
-
-# Inicializar Tailwind
-npx tailwindcss init -p
-```
-
-**Configurar `tailwind.config.ts`:**
-```typescript
-import type { Config } from "tailwindcss"
-
-const config: Config = {
-  content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-export default config
-```
-
-**Crear `app/globals.css`:**
-```css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-```
-
-**Crear `app/layout.tsx`:**
-```tsx
-import type { Metadata } from "next"
-import "./globals.css"
-
-export const metadata: Metadata = {
-  title: "Inmobiliaria Bolivia",
-  description: "Plataforma inmobiliaria boliviana",
-}
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <html lang="es">
-      <body>{children}</body>
-    </html>
-  )
-}
-```
-
-**Crear `app/page.tsx`:**
-```tsx
-export default function Home() {
-  return (
-    <main className="min-h-screen">
-      <h1 className="text-4xl font-bold">Inmobiliaria Bolivia</h1>
-    </main>
-  )
-}
-```
-
-### 4. Configurar shadcn/ui
-
-**Documentación oficial:** https://ui.shadcn.com/docs/installation
-
-```bash
-# Instalar dependencias requeridas
-npm install class-variance-authority clsx tailwind-merge
-
-# Crear utilidad lib/utils.ts
-mkdir -p lib
-```
-
-**Archivo `lib/utils.ts`:**
-```typescript
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-```
-
-**Inicializar shadcn/ui:**
-```bash
-npx shadcn-ui@latest init
-```
-
-**Durante la inicialización, responde:**
-- `Would you like to use TypeScript?` → **yes**
-- `Which style would you like to use?` → **Default**
-- `Which color would you like to use as base color?` → **Slate**
-- `Where is your global CSS file?` → **app/globals.css**
-- `Would you like to use CSS variables for colors?` → **yes**
-- `Where is your tailwind.config.js located?` → **tailwind.config.ts**
-- `Configure the import alias for components:` → **@/components**
-- `Configure the import alias for utils:` → **@/lib/utils**
-- `Are you using React Server Components?` → **yes**
-
-**Agregar componentes necesarios:**
-```bash
-npx shadcn-ui@latest add button
-npx shadcn-ui@latest add card
-npx shadcn-ui@latest add dialog
-npx shadcn-ui@latest add input
-npx shadcn-ui@latest add select
-npx shadcn-ui@latest add sheet
-npx shadcn-ui@latest add toast
-```
-
-### 5. Instalar dependencias adicionales
-
-**Zustand (Estado global):**
-```bash
-# Docs: https://docs.pmnd.rs/zustand/getting-started/installation
-npm install zustand
-```
-
-**TanStack Query (Fetching):**
-```bash
-# Docs: https://tanstack.com/query/latest/docs/framework/react/quick-start
-npm install @tanstack/react-query
-```
-
-**React Hook Form + Zod (Formularios):**
-```bash
-# Docs: https://react-hook-form.com/get-started
-# Docs: https://zod.dev/
+# 3. Instalar dependencias adicionales
+npm install zustand @tanstack/react-query
 npm install react-hook-form @hookform/resolvers zod
-```
-
-**Leaflet (Mapa):**
-```bash
-# Docs: https://leafletjs.com/
-# Docs: https://react-leaflet.js.org/
 npm install leaflet react-leaflet
 npm install -D @types/leaflet
-```
 
-**Lucide React (Iconos):**
-```bash
-# Docs: https://lucide.dev/
-npm install lucide-react
-```
+# 4. Configurar next.config.ts
+# Agregar: output: 'standalone'
 
-### 6. Probar la instalación
+# 5. Copiar .env
+cp .env.example .env.local
 
-```bash
-# Iniciar servidor de desarrollo
+# 6. Iniciar
 npm run dev
-
-# Abrir http://localhost:3000
-# Deberías ver "Inmobiliaria Bolivia" con estilos de Tailwind
 ```
 
-## 🔧 Instalación (Desde Repositorio)
+## 📥 Instalación desde Repositorio
 
 ```bash
 # Clonar el repositorio
@@ -307,7 +67,7 @@ cp .env.example .env.local
 
 ```env
 # API Backend
-NEXT_PUBLIC_API_URL=http://localhost:8080/api
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
 # Mapa (no requiere API key con OpenStreetMap)
 NEXT_PUBLIC_MAP_CENTER_LAT=-17.3895
@@ -339,6 +99,52 @@ npm start
 ### Verificar tipos TypeScript
 ```bash
 npm run type-check
+```
+
+## 🐳 Docker (Desarrollo)
+
+**Requiere Docker y Docker Compose instalados.**
+
+```bash
+# Desde la carpeta principal del proyecto
+cd ..
+
+# Levantar todos los servicios (Frontend + Backend + PostgreSQL + Redis)
+docker-compose up --build
+
+# Detener servicios
+docker-compose down
+
+# Ver logs
+docker-compose logs -f frontend
+```
+
+**Servicios disponibles:**
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001
+- PostgreSQL: localhost:5432
+- Redis: localhost:6379
+
+## 🧪 Probar la Instalación
+
+```bash
+# 1. Frontend - Abrir en navegador
+# http://localhost:3000
+
+# 2. Backend - Probar endpoint
+curl http://localhost:3001/health
+# Respuesta esperada: {"status":"ok","message":"API is running"}
+
+# 3. Backend - Probar API
+curl http://localhost:3001/api
+# Respuesta esperada: {"message":"Bienvenido a la API de Inmobiliaria Bolivia"}
+
+# 4. Verificar PostgreSQL (Docker)
+docker exec -it inmobiliaria-postgres psql -U inmobiliaria_user -d inmobiliaria
+
+# 5. Verificar Redis (Docker)
+docker exec -it inmobiliaria-redis redis-cli ping
+# Respuesta esperada: PONG
 ```
 
 ## 📁 Estructura del Proyecto
