@@ -49,9 +49,23 @@ npm run dev
 
 ## 📥 Instalación desde Repositorio
 
+⚠️ **IMPORTANTE:** Para evitar problemas con las rutas en Docker Compose, sigue estos pasos exactamente:
+
 ```bash
-# Clonar el repositorio
+# 1. Crear carpeta principal del proyecto
+mkdir Inmobiliaria365Soft
+cd Inmobiliaria365Soft
+
+# 2. Clonar el repositorio frontend
 git clone https://github.com/365Soft-Bolivia/Inmobiliaria_Frontend_365Soft.git
+
+# 3. Volver a la carpeta raiz
+cd ..
+
+# 4. Clonar el repositorio backend
+git clone https://github.com/365Soft-Bolivia/Inmobiliaria_Backend_365Soft.git
+
+# 5. Entrar a la carpeta frontend
 cd Inmobiliaria_Frontend_365Soft
 
 # Instalar dependencias
@@ -62,6 +76,15 @@ cp .env.example .env.local
 
 # Editar .env.local con tus valores
 ```
+
+**Estructura esperada:**
+```
+Inmobiliaria365Soft/
+├── Inmobiliaria_Frontend_365Soft/
+└── Inmobiliaria_Backend_365Soft/
+```
+
+Esta estructura es necesaria para que el `docker-compose.yml` funcione correctamente con las rutas relativas.
 
 ## ⚙️ Variables de Entorno
 
@@ -105,9 +128,11 @@ npm run type-check
 
 **Requiere Docker y Docker Compose instalados.**
 
+⚠️ **IMPORTANTE:** Asegúrate de tener ambos repositorios clonados en la misma carpeta principal siguiendo las instrucciones de la sección "Instalación desde Repositorio".
+
 ```bash
-# Desde la carpeta principal del proyecto
-cd ..
+# Desde la carpeta principal Inmobiliaria365Soft
+cd Inmobiliaria365Soft
 
 # Levantar todos los servicios (Frontend + Backend + PostgreSQL + Redis)
 docker-compose up --build
