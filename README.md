@@ -22,6 +22,15 @@ Frontend de la plataforma inmobiliaria boliviana. Interfaz responsiva con búsqu
 - Backend corriendo en `http://localhost:3001`
 - Opcional: Docker + Docker Compose (para PostgreSQL + Redis)
 
+---
+
+## 🚀 ¿Cuál sección seguir?
+
+- **Si vas a CLONAR el repositorio** (equipo de desarrollo, despliegue): → Ve a la sección **"📥 Instalación desde Repositorio"**
+- **Si quieres crear el proyecto DESDE CERO** (aprendizaje, nuevo proyecto): → Ve a la sección **"🔧 Crear desde Cero"**
+
+---
+
 ## 🔧 Crear desde Cero
 
 ```bash
@@ -48,6 +57,8 @@ npm run dev
 ```
 
 ## 📥 Instalación desde Repositorio
+
+**Esta es la sección que deben seguir los desarrolladores del equipo.**
 
 ⚠️ **IMPORTANTE:** Para evitar problemas con las rutas en Docker Compose, sigue estos pasos exactamente:
 
