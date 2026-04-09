@@ -51,7 +51,10 @@ export default function RegisterPage() {
       }
 
       localStorage.setItem("token", data.token)
-      localStorage.setItem("userName", data.nombre || formData.nombre)
+      localStorage.setItem("userName", data.user?.nombre || formData.nombre)
+
+      // Disparar evento para actualizar el header
+      window.dispatchEvent(new Event("auth-change"))
 
       // Mostrar toast, luego redirigir a la ruta principal
       setSuccess(true)

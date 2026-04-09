@@ -23,8 +23,8 @@ export function Header() {
       setUserName(name)
     }
 
-    // Escuchar cambios en localStorage (para actualizar cuando se loguee/desloguee)
-    const handleStorageChange = () => {
+    // Función para actualizar el estado desde localStorage
+    const updateAuthState = () => {
       const token = localStorage.getItem("token")
       const name = localStorage.getItem("userName")
       if (token && name) {
@@ -34,8 +34,20 @@ export function Header() {
       }
     }
 
-    window.addEventListener("storage", handleStorageChange)
-    return () => window.removeEventListener("storage", handleStorageChange)
+    // Escuchar cambios en localStorage (para actualizar cuando se loguee/desloguee en otra pestaña)
+    window.addEventListener("storage", updateAuthState)
+
+    // Escuchar evento personalizado para cambios en la misma pestaña
+    window.addEventListener("auth-change", updateAuthState)
+
+    // Escuchar cambios de foco en la ventana (para actualizar cuando vuelves de otra página)
+    window.addEventListener("focus", updateAuthState)
+
+    return () => {
+      window.removeEventListener("storage", updateAuthState)
+      window.removeEventListener("auth-change", updateAuthState)
+      window.removeEventListener("focus", updateAuthState)
+    }
   }, [])
 
   // Cerrar el dropdown del usuario cuando se hace click fuera de él
@@ -59,6 +71,10 @@ export function Header() {
     localStorage.removeItem("userName")
     setUserName(null)
     setUserMenuOpen(false)
+
+    // Disparar evento para notificar el cambio
+    window.dispatchEvent(new Event("auth-change"))
+
     router.push("/")
   }
 

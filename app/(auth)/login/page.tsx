@@ -37,13 +37,29 @@ export default function LoginPage() {
 
       // Guardar token y nombre de usuario
       localStorage.setItem("token", data.token)
-      localStorage.setItem("userName", data.nombre || data.usuario?.nombre || "Usuario")
+      localStorage.setItem("userName", data.user?.nombre || data.nombre || data.usuario?.nombre || "Usuario")
 
-      // Mostrar toast y redirigir
-      setSuccess(true)
-      setTimeout(() => {
-        router.push("/")
-      }, 3000)
+      // Verificar si es administrador
+      if (data.user?.rol === "admin") {
+        localStorage.setItem("isAdmin", "true")
+      }
+
+      // Disparar evento para actualizar el header
+      window.dispatchEvent(new Event("auth-change"))
+
+      // Si es admin, redirigir al panel de administración
+      if (data.user?.rol === "admin") {
+        setSuccess(true)
+        setTimeout(() => {
+          router.push("/admin")
+        }, 1500)
+      } else {
+        // Usuario normal, redirigir al home
+        setSuccess(true)
+        setTimeout(() => {
+          router.push("/")
+        }, 3000)
+      }
 
     } catch (error) {
       alert("Error al conectar con el servidor")
