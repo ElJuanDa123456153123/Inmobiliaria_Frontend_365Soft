@@ -88,10 +88,17 @@ export default function AdminLayout({
         <nav className="flex-1 p-4 space-y-2">
           <Link
             href="/admin"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
           >
             <Users className="h-5 w-5" />
-            <span className="font-medium">Usuarios</span>
+            <span className="font-medium">Usuarios Registrados</span>
+          </Link>
+          <Link
+            href="/admin/accesos"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <Key className="h-5 w-5" />
+            <span className="font-medium">Gestión de Accesos</span>
           </Link>
         </nav>
 

@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, MoreVertical, Edit, Trash2, Shield, ShieldCheck } from "lucide-react"
+import { Search, Shield, ShieldCheck, Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 interface User {
   id: number
@@ -18,11 +20,33 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const itemsPerPage = 10
 
   useEffect(() => {
     fetchUsers()
+    fetchMe()
   }, [])
+
+  const fetchMe = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("http://localhost:3001/api/auth/me", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        // data usually contains user object
+        const me = data.user || data
+        setCurrentUserId(me.id)
+      }
+    } catch (error) {
+      console.error("Error fetching me:", error)
+    }
+  }
 
   const fetchUsers = async () => {
     try {
@@ -94,16 +118,22 @@ export default function AdminUsersPage() {
     user.telefono.includes(searchTerm)
   )
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
+
   const getRoleBadgeColor = (rol: string) => {
     switch (rol) {
-      case "admin":
-        return "bg-purple-100 text-purple-800"
-      case "agente":
-        return "bg-blue-100 text-blue-800"
-      case "inmobiliaria":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+      case "admin": return "bg-primary/10 text-primary border border-primary/20"
+      case "agente": return "bg-blue-100 text-blue-800 border border-blue-200"
+      case "inmobiliaria": return "bg-emerald-100 text-emerald-800 border border-emerald-200"
+      default: return "bg-muted text-muted-foreground border border-border"
     }
   }
 
@@ -113,196 +143,147 @@ export default function AdminUsersPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-gray-600">Cargando usuarios...</div>
+      <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-primary/5 via-background to-primary/5 text-muted-foreground">
+        Cargando usuarios...
       </div>
     )
   }
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Usuarios Registrados</h1>
-        <p className="text-gray-600 mt-2">Gestiona todos los usuarios de la plataforma</p>
+    <div className="p-8 pb-20 min-h-full bg-gradient-to-br from-primary/5 via-background to-primary/5">
+      {/* Header aligned with Login aesthetics */}
+      <div className="mb-10">
+        <h1 className="text-3xl font-bold text-foreground font-serif tracking-tight">Usuarios Registrados</h1>
+        <p className="text-muted-foreground mt-2">Gestiona de manera global todos los usuarios de la plataforma</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
+        {[
+          { label: "Total Usuarios", count: users.length, colorClass: "text-foreground", bgIcon: "bg-primary/10", iconColor: "text-primary", icon: Shield },
+          { label: "Activos", count: users.filter(u => u.activo).length, colorClass: "text-emerald-600", bgIcon: "bg-emerald-100", iconColor: "text-emerald-600", icon: ShieldCheck },
+          { label: "Inactivos", count: users.filter(u => !u.activo).length, colorClass: "text-destructive", bgIcon: "bg-destructive/10", iconColor: "text-destructive", icon: Shield },
+          { label: "Verificados", count: users.filter(u => u.verificado).length, colorClass: "text-blue-600", bgIcon: "bg-blue-100", iconColor: "text-blue-600", icon: ShieldCheck },
+        ].map((stat, idx) => (
+          <div key={idx} className="bg-background rounded-xl shadow-sm border border-border p-6 flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Usuarios</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{users.length}</p>
+              <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+              <p className={`text-3xl font-bold mt-1 ${stat.colorClass}`}>{stat.count}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <Shield className="h-6 w-6 text-blue-600" />
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.bgIcon}`}>
+              <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
             </div>
           </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Activos</p>
-              <p className="text-3xl font-bold text-green-600 mt-1">{users.filter(u => u.activo).length}</p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <ShieldCheck className="h-6 w-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Inactivos</p>
-              <p className="text-3xl font-bold text-red-600 mt-1">{users.filter(u => !u.activo).length}</p>
-            </div>
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-              <Shield className="h-6 w-6 text-red-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Verificados</p>
-              <p className="text-3xl font-bold text-purple-600 mt-1">{users.filter(u => u.verificado).length}</p>
-            </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-              <ShieldCheck className="h-6 w-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-lg shadow mb-6 p-4">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
+      {/* Main Filter & Table */}
+      <div className="bg-background rounded-xl shadow-sm border border-border overflow-hidden mb-6">
+        {/* Toolbar */}
+        <div className="p-5 border-b border-border bg-muted/20">
+          <div className="relative max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <Input
               type="text"
               placeholder="Buscar por nombre, email o teléfono..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="pl-9 bg-background focus-visible:ring-primary/20 border-border h-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
-      </div>
 
-      {/* Users Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* Users Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300"
-                  />
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Usuario
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contacto
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rol
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Registro
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-muted/30 border-b border-border text-xs uppercase tracking-widest text-muted-foreground font-semibold">
+                <th className="px-6 py-4">ID</th>
+                <th className="px-6 py-4">Usuario</th>
+                <th className="px-6 py-4">Contacto</th>
+                <th className="px-6 py-4">Rol</th>
+                <th className="px-6 py-4">Estado</th>
+                <th className="px-6 py-4">Registro</th>
+                <th className="px-6 py-4 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUsers.length === 0 ? (
+            <tbody className="divide-y divide-border bg-background">
+              {currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
-                    No se encontraron usuarios
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <Shield className="h-10 w-10 mb-3 opacity-50" />
+                      <p className="text-base font-medium">No se encontraron usuarios</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                currentItems.map((user) => (
+                  <tr key={user.id} className="hover:bg-primary/5 transition-colors group">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-muted-foreground">
                       #{user.id}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                          <span className="text-white font-medium text-sm">
+                        <div className="flex-shrink-0 h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
+                          <span className="text-primary font-bold text-sm">
                             {user.nombre.charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.nombre}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
+                          <div className="text-sm font-semibold text-foreground">{user.nombre}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{user.email}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.telefono}</div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                      {user.telefono}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(user.rol)}`}>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider ${getRoleBadgeColor(user.rol)}`}>
                         {getRoleIcon(user.rol)}
-                        {user.rol.charAt(0).toUpperCase() + user.rol.slice(1)}
+                        {user.rol}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.activo
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${
+                        user.activo ? "bg-emerald-100 text-emerald-800" : "bg-destructive/10 text-destructive"
                       }`}>
                         {user.activo ? "Activo" : "Inactivo"}
                       </span>
                       {user.verificado && (
-                        <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        <span className="ml-2 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-100 text-blue-800">
                           Verificado
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       {new Date(user.created_at).toLocaleDateString("es-BO")}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
-                        <button
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleToggleActive(user.id)}
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50"
+                          className={user.activo ? "text-primary hover:text-primary/80" : "text-muted-foreground hover:text-foreground"}
                           title={user.activo ? "Desactivar" : "Activar"}
                         >
                           <Shield className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
+                        {user.id !== currentUserId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -314,28 +295,44 @@ export default function AdminUsersPage() {
 
         {/* Pagination */}
         {filteredUsers.length > 0 && (
-          <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t">
-            <div className="text-sm text-gray-700">
-              Mostrando <span className="font-medium">1</span> a{" "}
-              <span className="font-medium">{Math.min(10, filteredUsers.length)}</span> de{" "}
-              <span className="font-medium">{filteredUsers.length}</span> usuarios
+          <div className="bg-muted/10 px-6 py-4 flex items-center justify-between border-t border-border">
+            <div className="text-sm text-muted-foreground">
+              Mostrando <span className="font-medium text-foreground">{filteredUsers.length > 0 ? indexOfFirstItem + 1 : 0}</span> a{" "}
+              <span className="font-medium text-foreground">{Math.min(indexOfLastItem, filteredUsers.length)}</span> de{" "}
+              <span className="font-medium text-foreground">{filteredUsers.length}</span> usuarios
             </div>
             <div className="flex gap-2">
-              <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50" disabled>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
                 Anterior
-              </button>
-              <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
-                1
-              </button>
-              <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">
-                2
-              </button>
-              <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">
-                3
-              </button>
-              <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">
+              </Button>
+              
+              <div className="flex gap-1 overflow-x-auto max-w-[150px] sm:max-w-none">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className="min-w-[32px]"
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages || totalPages === 0}
+              >
                 Siguiente
-              </button>
+              </Button>
             </div>
           </div>
         )}
