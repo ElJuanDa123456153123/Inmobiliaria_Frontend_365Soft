@@ -11,8 +11,8 @@ interface PropertyCardProps {
   location: string
   price: string
   operationType: "venta" | "alquiler" | "anticretico"
-  bedrooms?: number
-  bathrooms?: number
+  bedrooms?: number | string
+  bathrooms?: number | string
   area?: string
   image: string
   publishedDate?: string
@@ -44,11 +44,10 @@ export function PropertyCard({
       featured && "ring-2 ring-primary"
     )}>
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-        <Image
+        <img
           src={image}
           alt={title}
-          fill
-          className="object-cover transition-transform group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform group-hover:scale-105"
         />
         <div className={cn(
           "absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-semibold text-white",

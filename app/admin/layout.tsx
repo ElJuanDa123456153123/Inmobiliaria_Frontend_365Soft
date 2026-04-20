@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Users, LogOut, Settings, Key, User } from "lucide-react"
+import { Users, LogOut, Settings, Key, User, Building, UserCog } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminLayout({
@@ -92,6 +92,20 @@ export default function AdminLayout({
           >
             <Users className="h-5 w-5" />
             <span className="font-medium">Usuarios Registrados</span>
+          </Link>
+          <Link
+            href="/admin/propiedades"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <Building className="h-5 w-5" />
+            <span className="font-medium">Gestionar Propiedades</span>
+          </Link>
+          <Link
+            href="/admin/asesores"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <UserCog className="h-5 w-5" />
+            <span className="font-medium">Asesores</span>
           </Link>
           <Link
             href="/admin/accesos"

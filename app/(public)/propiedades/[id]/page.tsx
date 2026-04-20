@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useParams } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import {
   MapPin,
@@ -14,84 +14,107 @@ import {
   Phone,
   Mail,
   Check,
-  X,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  ExternalLink,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
+import { apiService, Property } from "@/lib/services/api"
+import { toast } from "sonner"
+import { getImageUrl } from "@/lib/utils"
+import dynamic from "next/dynamic"
 
-// Datos de ejemplo
-const propertyData = {
-  id: "1",
-  title: "Residencia de Lujo en Urubó",
-  location: "Santa Cruz, Zona Urubó",
-  address: "Calle Principal #123, Urubó",
-  price: "$450,000",
-  operationType: "venta" as const,
-  bedrooms: 4,
-  bathrooms: 3,
-  area: "350m²",
-  description: "Hermosa residencia de lujo ubicada en la exclusiva zona de Urubó. Esta propiedad cuenta con acabados de primera calidad, amplios espacios, y una vista panorámica impresionante. La casa distribuye en sala comedor, cocina integral, 4 dormitorios con baño suite en el principal, baño de visitas, estudio, jardín y piscina.",
-  images: [
-    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&h=800&fit=crop",
-    "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&h=800&fit=crop",
-    "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&h=800&fit=crop",
-    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&h=800&fit=crop",
-  ],
-  features: {
-    general: [
-      { name: "Año de construcción", value: "2023" },
-      { name: "Estacionamiento", value: "2 vehículos" },
-      { name: "Antigüedad", value: "Estreno" },
-      { name: "Orientación", value: "Este" },
-    ],
-    amenities: [
-      "Piscina",
-      "Jardín",
-      "Terraza",
-      "Balcón",
-      "Churrasquera",
-      "Cuarto de servicio",
-      "Bodega",
-      "Sistema de seguridad",
-    ],
-    services: [
-      "Agua potable",
-      "Electricidad",
-      "Gas domiciliario",
-      "Internet fibra óptica",
-      "Cable",
-    ],
-  },
-  agent: {
-    name: "María González",
-    company: "365 Inmobiliaria",
-    phone: "+591 777 12345",
-    email: "maria@365soft.bo",
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
-  },
-  publishedDate: "2 días",
-  coordinates: {
-    lat: -17.7563,
-    lng: -63.1474,
-  },
-}
+// Cargar el mapa de forma dinámica para evitar problemas de SSR
+const Mapa = dynamic(() => import("@/components/mapa/Mapa"), {
+  ssr: false,
+  loading: () => <div className="w-full h-full bg-muted animate-pulse rounded-lg" />
+})
 
 export default function PropertyDetailPage() {
   const params = useParams()
+  const router = useRouter()
+  const [property, setProperty] = useState<Property | null>(null)
+  const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isFavorite, setIsFavorite] = useState(false)
 
+  // Cargar propiedad desde el backend
+  useEffect(() => {
+    const fetchProperty = async () => {
+      const id = params.id
+      if (!id) return
+
+      try {
+        const propertyData = await apiService.getProperty(parseInt(id as string))
+        setProperty(propertyData)
+      } catch (error) {
+        console.error('Error cargando propiedad:', error)
+        toast.error('Error al cargar la propiedad')
+        router.push('/propiedades')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProperty()
+  }, [params.id, router])
+
+  // Formatear precio
+  const formatPrice = () => {
+    if (!property) return ''
+
+    const precio = property.precio
+    const moneda = property.moneda === 'BOB' ? 'Bs' : '$'
+
+    if (property.tipo_operacion === 'alquiler') {
+      return `${moneda} ${precio.toLocaleString()}/mes`
+    } else if (property.tipo_operacion === 'anticretico') {
+      return `${moneda} ${precio.toLocaleString()} Anticrético`
+    } else {
+      return `${moneda} ${precio.toLocaleString()}`
+    }
+  }
+
+  // Obtener imágenes
+  const getImages = () => {
+    if (!property?.imagenes || property.imagenes.length === 0) {
+      return ["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&h=800&fit=crop"]
+    }
+    return property.imagenes.map(img => getImageUrl(img.image_url) || img.image_url)
+  }
+
+  const images = getImages()
+
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % propertyData.images.length)
+    setCurrentImageIndex((prev) => (prev + 1) % images.length)
   }
 
   const prevImage = () => {
     setCurrentImageIndex((prev) =>
-      prev === 0 ? propertyData.images.length - 1 : prev - 1
+      prev === 0 ? images.length - 1 : prev - 1
     )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Cargando propiedad...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (!property) {
+    return null
   }
 
   return (
@@ -107,7 +130,7 @@ export default function PropertyDetailPage() {
               <span className="mx-2">/</span>
               <a href="/propiedades" className="hover:text-foreground">Propiedades</a>
               <span className="mx-2">/</span>
-              <span className="text-foreground">{propertyData.title}</span>
+              <span className="text-foreground">{property.titulo}</span>
             </nav>
           </div>
         </div>
@@ -116,15 +139,14 @@ export default function PropertyDetailPage() {
         <section className="border-b border-border">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
             <div className="relative aspect-[16/9] rounded-2xl overflow-hidden bg-muted">
-              <Image
-                src={propertyData.images[currentImageIndex]}
-                alt={propertyData.title}
-                fill
-                className="object-cover"
+              <img
+                src={images[currentImageIndex]}
+                alt={property.titulo}
+                className="w-full h-full object-cover"
               />
 
               {/* Navigation arrows */}
-              {propertyData.images.length > 1 && (
+              {images.length > 1 && (
                 <>
                   <button
                     onClick={prevImage}
@@ -142,9 +164,9 @@ export default function PropertyDetailPage() {
               )}
 
               {/* Image counter */}
-              {propertyData.images.length > 1 && (
+              {images.length > 1 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-black/50 text-white text-sm">
-                  {currentImageIndex + 1} / {propertyData.images.length}
+                  {currentImageIndex + 1} / {images.length}
                 </div>
               )}
 
@@ -165,9 +187,9 @@ export default function PropertyDetailPage() {
             </div>
 
             {/* Thumbnails */}
-            {propertyData.images.length > 1 && (
+            {images.length > 1 && (
               <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
-                {propertyData.images.map((image, index) => (
+                {images.map((image, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
@@ -177,11 +199,10 @@ export default function PropertyDetailPage() {
                         : "border-border hover:border-primary/50"
                     }`}
                   >
-                    <Image
+                    <img
                       src={image}
                       alt={`Vista ${index + 1}`}
-                      fill
-                      className="object-cover"
+                      className="w-full h-full object-cover"
                     />
                   </button>
                 ))}
@@ -201,19 +222,19 @@ export default function PropertyDetailPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h1 className="text-3xl font-bold text-foreground mb-2">
-                        {propertyData.title}
+                        {property.titulo}
                       </h1>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <MapPin className="h-4 w-4" />
-                        <span>{propertyData.location}</span>
+                        <span>{property.zona}</span>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-3xl font-bold text-primary">
-                        {propertyData.price}
+                        {formatPrice()}
                       </div>
                       <div className="text-sm text-muted-foreground capitalize">
-                        {propertyData.operationType}
+                        {property.tipo_operacion}
                       </div>
                     </div>
                   </div>
@@ -222,15 +243,21 @@ export default function PropertyDetailPage() {
                   <div className="flex gap-6 py-4 border-y border-border">
                     <div className="flex items-center gap-2">
                       <Bed className="h-5 w-5 text-primary" />
-                      <span className="font-semibold">{propertyData.bedrooms} Dormitorios</span>
+                      <span className="font-semibold">{property.dormitorios} Dormitorios</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Bath className="h-5 w-5 text-primary" />
-                      <span className="font-semibold">{propertyData.bathrooms} Baños</span>
+                      <span className="font-semibold">{property.banos} Baños</span>
                     </div>
+                    {property.garaje && property.garaje !== "0" && (
+                      <div className="flex items-center gap-2">
+                        <Maximize className="h-5 w-5 text-primary" />
+                        <span className="font-semibold">{property.garaje} Garaje(s)</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <Maximize className="h-5 w-5 text-primary" />
-                      <span className="font-semibold">{propertyData.area}</span>
+                      <span className="font-semibold">{property.metros_edificados}m²</span>
                     </div>
                   </div>
                 </div>
@@ -238,65 +265,111 @@ export default function PropertyDetailPage() {
                 {/* Description */}
                 <div>
                   <h2 className="text-xl font-semibold mb-4">Descripción</h2>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {propertyData.description}
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {property.descripcion}
                   </p>
                 </div>
+
+                {/* Confort y Seguridad */}
+                {property.confort && Array.isArray(property.confort) && property.confort.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4">Confort</h2>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {property.confort.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Check className="h-5 w-5 text-green-500 shrink-0" />
+                          <span className="capitalize">{item.replace(/-/g, ' ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {property.seguridad && Array.isArray(property.seguridad) && property.seguridad.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4">Seguridad</h2>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {property.seguridad.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Check className="h-5 w-5 text-primary shrink-0" />
+                          <span className="capitalize">{item.replace(/-/g, ' ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Features */}
                 <div>
                   <h2 className="text-xl font-semibold mb-4">Características</h2>
                   <div className="grid sm:grid-cols-2 gap-4">
-                    {propertyData.features.general.map((feature, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 bg-card rounded-lg border border-border"
-                      >
-                        <span className="text-muted-foreground">{feature.name}</span>
-                        <span className="font-semibold">{feature.value}</span>
+                    {property.ano_construccion && (
+                      <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                        <span className="text-muted-foreground">Año de construcción</span>
+                        <span className="font-semibold">{property.ano_construccion}</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Amenities */}
-                <div>
-                  <h2 className="text-xl font-semibold mb-4">Servicios y Amenidades</h2>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {propertyData.features.amenities.map((amenity, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Check className="h-5 w-5 text-green-500 shrink-0" />
-                        <span>{amenity}</span>
+                    )}
+                    <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                      <span className="text-muted-foreground">Estado</span>
+                      <span className="font-semibold capitalize">{property.estado}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                      <span className="text-muted-foreground">Tipo de propiedad</span>
+                      <span className="font-semibold capitalize">{property.tipo_propiedad}</span>
+                    </div>
+                    {property.metros_terreno > 0 && (
+                      <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                        <span className="text-muted-foreground">Metros de terreno</span>
+                        <span className="font-semibold">{property.metros_terreno}m²</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Services */}
-                <div>
-                  <h2 className="text-xl font-semibold mb-4">Servicios Disponibles</h2>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {propertyData.features.services.map((service, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Check className="h-5 w-5 text-primary shrink-0" />
-                        <span>{service}</span>
+                    )}
+                    <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                      <span className="text-muted-foreground">Pisos</span>
+                      <span className="font-semibold">{property.cantidad_pisos}</span>
+                    </div>
+                    {property.apto_oficina && (
+                      <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                        <span className="text-muted-foreground">Apto oficina</span>
+                        <span className="font-semibold">Sí</span>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
 
                 {/* Location */}
-                <div>
-                  <h2 className="text-xl font-semibold mb-4">Ubicación</h2>
-                  <div className="bg-muted rounded-lg p-6 text-center">
-                    <MapPin className="h-12 w-12 mx-auto text-primary mb-4" />
-                    <p className="text-lg font-medium mb-2">{propertyData.address}</p>
-                    <p className="text-muted-foreground mb-4">{propertyData.location}</p>
-                    <Button variant="outline">
-                      Ver en mapa
-                    </Button>
+                {property.latitud && property.longitud && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4">Ubicación</h2>
+                    <div
+                      className="relative rounded-lg overflow-hidden border border-border cursor-pointer group"
+                      onClick={() => router.push(`/propiedades/${params.id}/mapa`)}
+                    >
+                      <div className="aspect-video w-full bg-muted">
+                        <Mapa
+                          latitud={property.latitud}
+                          longitud={property.longitud}
+                          zoom={15}
+                          height="100%"
+                          interactive={false}
+                          showMarker={true}
+                        />
+                      </div>
+                      {/* Overlay con hover */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                        <div className="bg-white/95 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                          <ExternalLink className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Click para ver mapa completo</span>
+                        </div>
+                      </div>
+                    </div>
+                    {property.direccion && (
+                      <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        {property.direccion}, {property.zona}
+                      </p>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Sidebar - Contact Card */}
@@ -304,34 +377,37 @@ export default function PropertyDetailPage() {
                 <div className="sticky top-4 space-y-6">
                   {/* Agent Card */}
                   <div className="bg-card rounded-xl p-6 shadow-lg border border-border">
-                    <h3 className="font-semibold text-lg mb-4">Contactar Agente</h3>
+                    <h3 className="font-semibold text-lg mb-4">Contactar Vendedor</h3>
 
                     <div className="flex items-center gap-4 mb-6">
-                      <div className="relative h-16 w-16 rounded-full overflow-hidden bg-muted">
-                        <Image
-                          src={propertyData.agent.image}
-                          alt={propertyData.agent.name}
-                          fill
-                          className="object-cover"
-                        />
+                      <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white text-2xl font-bold">
+                        {property.vendedor_nombre.charAt(0)}
                       </div>
                       <div>
-                        <div className="font-semibold">{propertyData.agent.name}</div>
+                        <div className="font-semibold">{property.vendedor_nombre}</div>
                         <div className="text-sm text-muted-foreground">
-                          {propertyData.agent.company}
+                          {property.vendedor_contacto || "Propietario"}
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <Button className="w-full" size="lg">
-                        <Phone className="h-4 w-4 mr-2" />
-                        Llamar ahora
-                      </Button>
-                      <Button className="w-full" variant="outline" size="lg">
-                        <Mail className="h-4 w-4 mr-2" />
-                        Enviar mensaje
-                      </Button>
+                      {property.vendedor_telefono && (
+                        <Button className="w-full" size="lg" asChild>
+                          <a href={`tel:${property.vendedor_telefono}`}>
+                            <Phone className="h-4 w-4 mr-2" />
+                            Llamar ahora
+                          </a>
+                        </Button>
+                      )}
+                      {property.vendedor_email && (
+                        <Button className="w-full" variant="outline" size="lg" asChild>
+                          <a href={`mailto:${property.vendedor_email}`}>
+                            <Mail className="h-4 w-4 mr-2" />
+                            Enviar mensaje
+                          </a>
+                        </Button>
+                      )}
                       <Button className="w-full" variant="outline" size="lg">
                         <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -341,24 +417,30 @@ export default function PropertyDetailPage() {
                     </div>
 
                     <div className="pt-4 border-t border-border space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        <span>{propertyData.agent.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-4 w-4" />
-                        <span>{propertyData.agent.email}</span>
-                      </div>
+                      {property.vendedor_telefono && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Phone className="h-4 w-4" />
+                          <span>{property.vendedor_telefono}</span>
+                        </div>
+                      )}
+                      {property.vendedor_horario && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>{property.vendedor_horario}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Publication Date */}
-                  <div className="bg-card rounded-xl p-4 border border-border">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      <span>Publicado hace {propertyData.publishedDate}</span>
+                  {property.fecha_publicacion && (
+                    <div className="bg-card rounded-xl p-4 border border-border">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span>Publicado el {new Date(property.fecha_publicacion).toLocaleDateString('es-BO', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,0 +1,793 @@
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
+import { useFormularioPublicacion } from "@/lib/store/formularioPublicacion"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Header } from "@/components/layout/header"
+import { Footer } from "@/components/layout/footer"
+import MapaSelector from "@/components/mapa/MapaSelector"
+import UploadImagenes from "@/components/propiedades/UploadImagenes"
+import EditorDescripcion from "@/components/propiedades/EditorDescripcion"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+type PasoType = 1 | 2 | 3 | 4 | 5 | 6 | 7
+
+const pasos = [
+  { id: 1, nombre: "Datos operación" },
+  { id: 2, nombre: "Datos generales" },
+  { id: 3, nombre: "Detalles de la propiedad" },
+  { id: 4, nombre: "Confort y seguridad" },
+  { id: 5, nombre: "Gestor imágen." },
+  { id: 6, nombre: "Descripción" },
+  { id: 7, nombre: "Resumen" },
+]
+
+export default function FormularioPublicarPage() {
+  const router = useRouter()
+  const {
+    pasoActual,
+    datosOperacion,
+    datosGenerales,
+    detallesPropiedad,
+    confortSeguridad,
+    imagenesDatos,
+    descripcionDatos,
+    setPasoActual,
+    setDatosOperacion,
+    setDatosGenerales,
+    setDetallesPropiedad,
+    setConfortSeguridad,
+    setImagenesDatos,
+    setDescripcionDatos,
+    addImagen,
+    removeImagen,
+    updateImagenOrden,
+    resetFormulario,
+  } = useFormularioPublicacion()
+
+  // Cargar plan seleccionado de localStorage
+  useEffect(() => {
+    const plan = localStorage.getItem('planSeleccionado')
+    if (plan) {
+      toast.success(`Plan seleccionado: ${plan}`)
+      localStorage.removeItem('planSeleccionado')
+    }
+  }, [])
+
+  const handleNextStep = () => {
+    if (pasoActual < 7) {
+      // Validar paso actual antes de avanzar
+      if (!validarPasoActual()) {
+        toast.error('Completa los campos obligatorios antes de continuar')
+        return
+      }
+      setPasoActual(pasoActual + 1)
+      toast.success('Progreso guardado automáticamente')
+    }
+  }
+
+  const handlePrevStep = () => {
+    if (pasoActual > 1) {
+      setPasoActual(pasoActual - 1)
+    }
+  }
+
+  const validarPasoActual = () => {
+    switch (pasoActual) {
+      case 1:
+        return datosOperacion.titulo.length >= 10 &&
+               datosOperacion.tipoOperacion &&
+               datosOperacion.precio
+      case 2:
+        return datosGenerales.tipoPropiedad &&
+               datosGenerales.zona.length >= 3
+      case 3:
+        return detallesPropiedad.dormitorios &&
+               detallesPropiedad.banos &&
+               detallesPropiedad.metrosEdificados &&
+               detallesPropiedad.estado
+      case 5:
+        return imagenesDatos.imagenes.length >= 1
+      case 6:
+        return descripcionDatos.descripcion.length >= 20
+      default:
+        return true
+    }
+  }
+
+  const handleSubmit = () => {
+    console.log("Formulario completo:", {
+      datosOperacion,
+      datosGenerales,
+      detallesPropiedad,
+      confortSeguridad,
+      imagenesDatos,
+      descripcionDatos,
+    })
+
+    toast.success('¡Propiedad publicada con éxito!', {
+      description: 'Será redirigido a tu perfil...',
+      duration: 3000,
+    })
+
+    setTimeout(() => {
+      resetFormulario()
+      router.push('/perfil')
+    }, 2000)
+  }
+
+  const calcularProgreso = () => {
+    return Math.round((pasoActual / 7) * 100)
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <Header />
+
+      <main className="flex-1 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Sidebar - Pasos */}
+            <div className="lg:w-72 flex-shrink-0">
+              <div className="bg-white rounded-lg shadow-md p-6 sticky top-4">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">
+                  Ingreso de propiedad
+                </h2>
+
+                <nav className="space-y-1">
+                  {pasos.map((paso) => (
+                    <button
+                      key={paso.id}
+                      onClick={() => setPasoActual(paso.id as PasoType)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                        pasoActual === paso.id
+                          ? "bg-primary text-white font-semibold"
+                          : "hover:bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      <span className="text-sm">
+                        {pasoActual === paso.id ? "▶" : " "} {paso.id}. {paso.nombre}
+                      </span>
+                    </button>
+                  ))}
+                </nav>
+
+                <div className="border-t mt-6 pt-6">
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    Completa el proceso para publicar
+                  </p>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all"
+                      style={{ width: `${calcularProgreso()}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    {calcularProgreso()}% del progreso
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Contenido principal */}
+            <div className="flex-1">
+              <div className="bg-white rounded-lg shadow-md p-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                  Ingreso de propiedad
+                </h2>
+
+                <h3 className="text-lg font-semibold text-gray-800 mb-6">
+                  {pasoActual}. {pasos.find(p => p.id === pasoActual)?.nombre}
+                </h3>
+
+                {/* PASO 1 - Datos de la operación */}
+                {pasoActual === 1 && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-6"
+                  >
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Título de la propiedad <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="text"
+                        required
+                        value={datosOperacion.titulo}
+                        onChange={(e) => setDatosOperacion({ titulo: e.target.value })}
+                        placeholder=""
+                        maxLength={80}
+                        className="bg-gray-50 border-gray-300"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Quedan {80 - datosOperacion.titulo.length} car.</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Tipo de operación <span className="text-red-500">*</span>
+                      </label>
+                      <Select value={datosOperacion.tipoOperacion} onValueChange={(value) => setDatosOperacion({ tipoOperacion: value as any })}>
+                        <SelectTrigger className="bg-gray-50 border-gray-300">
+                          <SelectValue placeholder="Venta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="venta">Venta</SelectItem>
+                          <SelectItem value="alquiler">Alquiler</SelectItem>
+                          <SelectItem value="anticretico">Anticrético</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Precio de venta <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex gap-2">
+                        <Select value={datosOperacion.moneda} onValueChange={(value) => setDatosOperacion({ moneda: value as any })}>
+                          <SelectTrigger className="w-24 bg-gray-50 border-gray-300">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">U$S</SelectItem>
+                            <SelectItem value="BOB">Bs</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          required
+                          value={datosOperacion.precio}
+                          onChange={(e) => setDatosOperacion({ precio: e.target.value })}
+                          placeholder=""
+                          className="flex-1 bg-gray-50 border-gray-300"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Acepta permuta:
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="aceptaPermuta"
+                            checked={datosOperacion.aceptaPermuta}
+                            onChange={() => setDatosOperacion({ aceptaPermuta: true })}
+                          />
+                          <span>Sí</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="aceptaPermuta"
+                            checked={!datosOperacion.aceptaPermuta}
+                            onChange={() => setDatosOperacion({ aceptaPermuta: false })}
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Financia:
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="financia"
+                            checked={datosOperacion.financia}
+                            onChange={() => setDatosOperacion({ financia: true })}
+                          />
+                          <span>Sí</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="financia"
+                            checked={!datosOperacion.financia}
+                            onChange={() => setDatosOperacion({ financia: false })}
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4">
+                      <Button
+                        onClick={handleNextStep}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        Siguiente {">"}
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* PASO 2 - Datos generales */}
+                {pasoActual === 2 && (
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Tipo de propiedad <span className="text-red-500">*</span>
+                      </label>
+                      <Select value={formData.tipoPropiedad} onValueChange={(value) => setFormData({ ...formData, tipoPropiedad: value })}>
+                        <SelectTrigger className="bg-gray-50 border-gray-300">
+                          <SelectValue placeholder="Casas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="casa">Casas</SelectItem>
+                          <SelectItem value="departamento">Departamentos</SelectItem>
+                          <SelectItem value="terreno">Terrenos</SelectItem>
+                          <SelectItem value="oficina">Oficinas</SelectItem>
+                          <SelectItem value="local">Local Comercial</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="border-t pt-6">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-4">— Ubicación —</h4>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Dirección:
+                          </label>
+                          <Input
+                            type="text"
+                            value={formData.direccion}
+                            onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                            placeholder="Introduce una ubicación"
+                            className="bg-gray-50 border-gray-300"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">* Puedes elegir no mostrar la dirección</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Zona <span className="text-red-500">*</span>
+                          </label>
+                          <Input
+                            type="text"
+                            required
+                            value={formData.zona}
+                            onChange={(e) => setFormData({ ...formData, zona: e.target.value })}
+                            placeholder="Escribe una ubicación"
+                            className="bg-gray-50 border-gray-300"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Tipo marcador:
+                          </label>
+                          <Select value={formData.tipoMarcador} onValueChange={(value) => setFormData({ ...formData, tipoMarcador: value })}>
+                            <SelectTrigger className="bg-gray-50 border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="punto-exacto">Punto exacto</SelectItem>
+                              <SelectItem value="aproximado">Aproximado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
+                          <p className="text-sm text-gray-600">
+                            Ingresa una dirección para activar el mapa
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between pt-4">
+                      <Button
+                        onClick={handlePrevStep}
+                        variant="outline"
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        onClick={handleNextStep}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        Siguiente {">"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* PASO 3 - Detalles de la propiedad */}
+                {pasoActual === 3 && (
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Dormitorios <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex gap-3 flex-wrap">
+                        {["1Amb.", "1", "2", "3", "4", "5+"].map((opcion) => (
+                          <label key={opcion} className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="dormitorios"
+                              value={opcion}
+                              checked={formData.dormitorios === opcion}
+                              onChange={(e) => setFormData({ ...formData, dormitorios: e.target.value })}
+                            />
+                            <span>{opcion}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Baños <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex gap-3">
+                        {["1", "2", "3+"].map((opcion) => (
+                          <label key={opcion} className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="banos"
+                              value={opcion}
+                              checked={formData.banos === opcion}
+                              onChange={(e) => setFormData({ ...formData, banos: e.target.value })}
+                            />
+                            <span>{opcion}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Garaje:
+                      </label>
+                      <div className="flex gap-3">
+                        {["1", "2", "3+"].map((opcion) => (
+                          <label key={opcion} className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="garaje"
+                              value={opcion}
+                              checked={formData.garaje === opcion}
+                              onChange={(e) => setFormData({ ...formData, garaje: e.target.value })}
+                            />
+                            <span>{opcion}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Metros edificados <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="number"
+                        required
+                        value={formData.metrosEdificados}
+                        onChange={(e) => setFormData({ ...formData, metrosEdificados: e.target.value })}
+                        className="bg-gray-50 border-gray-300"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Metros del terreno:
+                      </label>
+                      <Input
+                        type="number"
+                        value={formData.metrosTerreno}
+                        onChange={(e) => setFormData({ ...formData, metrosTerreno: e.target.value })}
+                        className="bg-gray-50 border-gray-300"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Estado <span className="text-red-500">*</span>
+                        </label>
+                        <Select value={formData.estado} onValueChange={(value) => setFormData({ ...formData, estado: value })}>
+                          <SelectTrigger className="bg-gray-50 border-gray-300">
+                            <SelectValue placeholder="Sin Definir" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="sin-definir">Sin Definir</SelectItem>
+                            <SelectItem value="excelente">Excelente</SelectItem>
+                            <SelectItem value="muy-bueno">Muy Bueno</SelectItem>
+                            <SelectItem value="bueno">Bueno</SelectItem>
+                            <SelectItem value="regular">Regular</SelectItem>
+                            <SelectItem value="a-estrenar">A Estrenar</SelectItem>
+                            <SelectItem value="en-construccion">En Construcción</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Año construc.:
+                        </label>
+                        <Input
+                          type="number"
+                          value={formData.anoConstruccion}
+                          onChange={(e) => setFormData({ ...formData, anoConstruccion: e.target.value })}
+                          className="bg-gray-50 border-gray-300"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.aptoOficina}
+                          onChange={(e) => setFormData({ ...formData, aptoOficina: e.target.checked })}
+                        />
+                        <span className="text-sm">Apto para oficina:</span>
+                      </label>
+
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.viviendaSocial}
+                          onChange={(e) => setFormData({ ...formData, viviendaSocial: e.target.checked })}
+                        />
+                        <span className="text-sm">Vivienda social:</span>
+                      </label>
+
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.condominio}
+                          onChange={(e) => setFormData({ ...formData, condominio: e.target.checked })}
+                        />
+                        <span className="text-sm">Condominio:</span>
+                      </label>
+
+                      <div>
+                        <span className="text-sm font-semibold text-gray-700">Cantidad de pisos:</span>
+                        <div className="flex gap-3 mt-1">
+                          {["1", "2", "3+"].map((opcion) => (
+                            <label key={opcion} className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="cantidadPisos"
+                                value={opcion}
+                                checked={formData.cantidadPisos === opcion}
+                                onChange={(e) => setFormData({ ...formData, cantidadPisos: e.target.value })}
+                              />
+                              <span>{opcion}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between pt-4">
+                      <Button
+                        onClick={handlePrevStep}
+                        variant="outline"
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        onClick={handleNextStep}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        Siguiente {">"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* PASO 4 - Confort y seguridad */}
+                {pasoActual === 4 && (
+                  <div className="space-y-6">
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" />
+                      <span className="text-sm">No aplica</span>
+                    </label>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Confort:
+                      </label>
+                      <Select>
+                        <SelectTrigger className="bg-gray-50 border-gray-300">
+                          <SelectValue placeholder="Seleccione una o más opciones" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="aire-acondicionado">Aire Acondicionado</SelectItem>
+                          <SelectItem value="calefaccion">Calefacción</SelectItem>
+                          <SelectItem value="piscina">Piscina</SelectItem>
+                          <SelectItem value="jardin">Jardín</SelectItem>
+                          <SelectItem value="terraza">Terraza</SelectItem>
+                          <SelectItem value="balkon">Balcón</SelectItem>
+                          <SelectItem value="gimnasio">Gimnasio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Seguridad:
+                      </label>
+                      <Select>
+                        <SelectTrigger className="bg-gray-50 border-gray-300">
+                          <SelectValue placeholder="Seleccione una o más opciones" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="seguridad-24h">Seguridad 24hs</SelectItem>
+                          <SelectItem value="porton-electrico">Portón Eléctrico</SelectItem>
+                          <SelectItem value="camaras">Cámaras</SelectItem>
+                          <SelectItem value="alarma">Alarma</SelectItem>
+                          <SelectItem value="guardia">Guardia</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex justify-between pt-4">
+                      <Button
+                        onClick={handlePrevStep}
+                        variant="outline"
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        onClick={handleNextStep}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        Siguiente {">"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* PASO 5 - Gestor de imágenes */}
+                {pasoActual === 5 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                        5. Gestor de imágenes <span className="text-red-500">*</span>
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        Selecciona varios archivos a la vez (solo formato JPG). Puedes subir hasta 30 imágenes.
+                        Para ordenar, haz click y mueve la imagen donde desees.
+                      </p>
+                    </div>
+
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center bg-gray-50">
+                      <Button className="bg-primary hover:bg-primary/90">
+                        ▲ Subir imágenes
+                      </Button>
+                    </div>
+
+                    <div className="border-t pt-6">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                        — Gestor de archivos adjuntos —
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Formato admitido: PDF (planos, memoria, etc)
+                      </p>
+                      <Button variant="outline">
+                        ▲ Subir archivos
+                      </Button>
+                    </div>
+
+                    <div className="border-t pt-6">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                        — Extras —
+                      </h4>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Video (Link Youtube):
+                      </label>
+                      <Input
+                        type="text"
+                        value={formData.video}
+                        onChange={(e) => setFormData({ ...formData, video: e.target.value })}
+                        className="bg-gray-50 border-gray-300"
+                      />
+                    </div>
+
+                    <div className="flex justify-between pt-4">
+                      <Button
+                        onClick={handlePrevStep}
+                        variant="outline"
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        onClick={handleNextStep}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        Siguiente {">"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* PASO 6 - Descripción */}
+                {pasoActual === 6 && (
+                  <div className="space-y-6">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                      6. Descripción de la propiedad
+                    </h4>
+
+                    <div className="border border-gray-300 rounded-lg">
+                      <div className="bg-gray-50 border-b p-2 flex gap-1">
+                        <Button variant="ghost" size="sm" className="font-bold">B</Button>
+                        <Button variant="ghost" size="sm" className="italic">I</Button>
+                        <Button variant="ghost" size="sm" className="underline">U</Button>
+                        <Button variant="ghost" size="sm">S</Button>
+                      </div>
+                      <textarea
+                        value={formData.descripcion}
+                        onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                        rows={8}
+                        className="w-full px-4 py-3 rounded-b-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="Describe tu propiedad aquí..."
+                      />
+                    </div>
+
+                    <div className="border-t pt-6">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                        — Términos y condiciones —
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-3">
+                        De ser necesario, ingresa términos y condiciones adicionales.
+                      </p>
+                      <p className="text-xs text-gray-500 mb-2">Quedan 250 caracteres</p>
+                      <textarea
+                        value={formData.terminosCondiciones}
+                        onChange={(e) => setFormData({ ...formData, terminosCondiciones: e.target.value })}
+                        rows={3}
+                        maxLength={250}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="Ejemplo: Depósito fijo del 10%."
+                      />
+                    </div>
+
+                    <div className="flex justify-between pt-4">
+                      <Button
+                        onClick={handlePrevStep}
+                        variant="outline"
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        onClick={handleSubmit}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        Completar información {">"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  )
+}
