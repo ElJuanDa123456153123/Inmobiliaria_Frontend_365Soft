@@ -9,11 +9,15 @@ export interface AdminProperty {
   tipo_operacion: string
   precio: number
   moneda: string
+  acepta_permuta: boolean
+  financia: boolean
   tipo_propiedad: string
   direccion: string
   zona: string
+  tipo_marcador?: string
   latitud?: number
   longitud?: number
+  mostrar_direccion: boolean
   dormitorios: string
   banos: string
   garaje: string

@@ -229,9 +229,18 @@ export default function AdminPropertiesPage() {
   return (
     <div className="p-8 pb-20 min-h-full bg-gradient-to-br from-primary/5 via-background to-primary/5">
       {/* Header */}
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold text-foreground font-serif tracking-tight">Gestionar Propiedades</h1>
-        <p className="text-muted-foreground mt-2">Administra todas las propiedades de la plataforma</p>
+      <div className="mb-10 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground font-serif tracking-tight">Gestionar Propiedades</h1>
+          <p className="text-muted-foreground mt-2">Administra todas las propiedades de la plataforma</p>
+        </div>
+        <Button
+          onClick={() => router.push('/admin/propiedades/crear')}
+          className="bg-primary hover:bg-primary/90"
+        >
+          <Building className="h-4 w-4 mr-2" />
+          Nueva Propiedad
+        </Button>
       </div>
 
       {/* Stats */}
