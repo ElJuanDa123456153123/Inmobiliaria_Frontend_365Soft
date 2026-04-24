@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { PropertyCard } from "./property-card"
 import { apiService, Property } from "@/lib/services/api"
 import { Loader2 } from "lucide-react"
+import { getImageUrl } from "@/lib/utils"
 
 export function FeaturedProperties() {
   const [properties, setProperties] = useState<Property[]>([])
@@ -65,7 +66,15 @@ export function FeaturedProperties() {
       ? property.imagenes.find(img => img.principal) || property.imagenes[0]
       : null
 
-    const image = mainImage?.image_url || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
+    // Usar getImageUrl() para convertir la URL del backend a una URL completa válida
+    const imageUrl = mainImage?.image_url
+
+    // Debug: Log para ver qué está llegando
+    console.log('Property:', property.titulo, 'Image URL:', imageUrl, 'Main image:', mainImage)
+
+    const image = getImageUrl(imageUrl) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
+
+    console.log('Final image URL:', image)
 
     return {
       id: property.id.toString(),

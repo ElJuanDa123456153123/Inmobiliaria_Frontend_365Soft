@@ -1,46 +1,6 @@
 import Link from "next/link"
 import { Mail, Phone, MapPin } from "lucide-react"
 
-const footerSections = [
-  {
-    title: "Alquileres y Ventas",
-    links: [
-      { name: "Alquiler en Santa Cruz", href: "/alquiler/santa-cruz" },
-      { name: "Alquiler en Norte", href: "/alquiler/norte" },
-      { name: "Alquiler en La Paz", href: "/alquiler/la-paz" },
-      { name: "Alquiler en Achumani", href: "/alquiler/achumani" },
-      { name: "Alquiler en Cochabamba", href: "/alquiler/cochabamba" },
-    ],
-  },
-  {
-    title: "Alquileres",
-    links: [
-      { name: "Alquiler de casas en Santa Cruz", href: "/alquiler/casas/santa-cruz" },
-      { name: "Alquiler de casas en Norte", href: "/alquiler/casas/norte" },
-      { name: "Alquiler de departamentos en Santa Cruz", href: "/alquiler/departamentos/santa-cruz" },
-      { name: "Alquiler de departamentos en La Paz", href: "/alquiler/departamentos/la-paz" },
-    ],
-  },
-  {
-    title: "Ventas",
-    links: [
-      { name: "Venta de casas en Santa Cruz", href: "/venta/casas/santa-cruz" },
-      { name: "Venta de casas en Norte", href: "/venta/casas/norte" },
-      { name: "Venta de departamentos en Santa Cruz", href: "/venta/departamentos/santa-cruz" },
-      { name: "Venta de departamentos en La Paz", href: "/venta/departamentos/la-paz" },
-    ],
-  },
-  {
-    title: "Alojamientos",
-    links: [
-      { name: "Alojamientos en Santa Cruz", href: "/alojamientos/santa-cruz" },
-      { name: "Alojamientos en Norte", href: "/alojamientos/norte" },
-      { name: "Alojamientos en Urubó", href: "/alojamientos/urubo" },
-      { name: "Alojamientos en La Paz", href: "/alojamientos/la-paz" },
-    ],
-  },
-]
-
 const legalLinks = [
   { name: "Preguntas Frecuentes", href: "/faq" },
   { name: "Aviso Legal", href: "/aviso-legal" },
@@ -60,39 +20,16 @@ export function Footer() {
     <footer className="border-t border-border/40 bg-muted/30">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Main sections */}
-        <div className="py-12 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
-          {footerSections.map((section, index) => (
-            <div key={index}>
-              <h3 className="font-semibold text-foreground mb-4 text-sm">
-                {section.title}
-              </h3>
-              <ul className="space-y-3">
-                {section.links.map((link, linkIndex) => (
-                  <li key={linkIndex}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-
-          {/* Contact and App section */}
+        <div className="py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* About section */}
           <div>
-            <h3 className="font-semibold text-foreground mb-4 text-sm">
-              Descargá la app
-            </h3>
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground mb-4">
-                Tu nuevo hogar a una descarga de distancia
-              </p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xl font-bold text-primary">365SOFT</span>
             </div>
-
-            <h3 className="font-semibold text-foreground mb-4 text-sm mt-6">
+            <p className="text-sm text-muted-foreground mb-4">
+              Tu plataforma inmobiliaria de confianza en Bolivia
+            </p>
+            <h3 className="font-semibold text-foreground mb-3 text-sm">
               Contacto
             </h3>
             <ul className="space-y-3">
@@ -114,30 +51,49 @@ export function Footer() {
               </li>
             </ul>
           </div>
-        </div>
 
-        {/* Bottom section */}
-        <div className="border-t border-border/40 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-primary">365SOFT</span>
-              <span className="text-sm text-muted-foreground">© 2026</span>
+          {/* App section */}
+          <div>
+            <h3 className="font-semibold text-foreground mb-4 text-sm">
+              Descargá la app
+            </h3>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Tu nuevo hogar a una descarga de distancia
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Próximamente en iOS y Android
+              </p>
             </div>
+          </div>
 
-            {/* Social links */}
-            <div className="flex items-center gap-4">
+          {/* Social section */}
+          <div>
+            <h3 className="font-semibold text-foreground mb-4 text-sm">
+              Síguenos
+            </h3>
+            <div className="space-y-3">
               {socialLinks.map((social) => (
                 <a
                   key={social.name}
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="block text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {social.name}
                 </a>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom section */}
+        <div className="border-t border-border/40 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            {/* Copyright */}
+            <div className="text-sm text-muted-foreground">
+              © 2026 365Soft Bolivia S.R.L. Todos los derechos reservados.
             </div>
 
             {/* Legal links */}

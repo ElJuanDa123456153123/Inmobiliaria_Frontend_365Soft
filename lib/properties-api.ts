@@ -196,23 +196,6 @@ export async function getProperty(id: number): Promise<Property> {
 }
 
 /**
- * Obtiene la URL de la imagen principal de una propiedad
- */
-export function getMainImageUrl(property: Property): string {
-  if (property.property_images && property.property_images.length > 0) {
-    const mainImage = property.property_images.find(img => img.principal)
-    if (mainImage) {
-      return `${API_URL}${mainImage.image_url}`
-    }
-    // Si no hay principal, usar la primera
-    return `${API_URL}${property.property_images[0].image_url}`
-  }
-
-  // Imagen por defecto
-  return 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop'
-}
-
-/**
  * Formatea el precio de una propiedad
  */
 export function formatPrice(property: Property): string {

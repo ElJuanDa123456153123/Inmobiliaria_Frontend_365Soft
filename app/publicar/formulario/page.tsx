@@ -44,6 +44,7 @@ function FormularioContent() {
   const router = useRouter()
   const [publishing, setPublishing] = useState(false)
   const [mapaCentro, setMapaCentro] = useState<{ lat: number; lng: number } | undefined>()
+  const [isAdmin, setIsAdmin] = useState(false)
   const {
     pasoActual,
     datosOperacion,
@@ -61,6 +62,12 @@ function FormularioContent() {
     setDescripcionDatos,
     resetFormulario,
   } = useFormularioPublicacion()
+
+  // Detectar si es admin
+  useEffect(() => {
+    const adminFlag = localStorage.getItem('isAdmin')
+    setIsAdmin(adminFlag === 'true')
+  }, [])
 
   // Cargar plan seleccionado de localStorage
   useEffect(() => {
@@ -217,7 +224,7 @@ function FormularioContent() {
 
       // Redirigir después de un momento
       setTimeout(() => {
-        router.push('/perfil')
+        router.push(isAdmin ? '/admin/propiedades' : '/perfil')
       }, 2000)
     } catch (error: any) {
       console.error('Error publicando propiedad:', error)
@@ -232,11 +239,26 @@ function FormularioContent() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      <Header />
+    <div className={isAdmin ? "min-h-screen bg-gray-100" : "flex flex-col min-h-screen bg-gray-50"}>
+      {!isAdmin && <Header />}
 
-      <main className="flex-1 py-8">
+      <main className={isAdmin ? "flex-1 py-8" : "flex-1 py-8"}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header para admin */}
+          {isAdmin && (
+            <div className="mb-6">
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/admin/propiedades')}
+                className="mb-4"
+              >
+                ← Volver al Panel de Admin
+              </Button>
+              <h1 className="text-3xl font-bold text-gray-900">Publicar Propiedad</h1>
+              <p className="text-gray-600 mt-2">Completa el formulario para publicar una nueva propiedad</p>
+            </div>
+          )}
+
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar - Pasos */}
             <div className="lg:w-72 flex-shrink-0">
@@ -991,10 +1013,12 @@ function FormularioContent() {
         </div>
       </main>
 
-      <Footer />
+      {!isAdmin && <Footer />}
     </div>
   )
 }
+
+export { FormularioContent }
 
 export default function FormularioPublicarPage() {
   return (

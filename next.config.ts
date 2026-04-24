@@ -25,6 +25,18 @@ const nextConfig: NextConfig = {
         pathname: '/api/imagenes/**',
       },
     ],
+    // Permitir imágenes data URLs (base64)
+    unoptimized: false,
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
+  // Configuración para el servidor de desarrollo
+  experimental: {
+    // Aumentar el tamaño máximo del body
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
   },
 };
 

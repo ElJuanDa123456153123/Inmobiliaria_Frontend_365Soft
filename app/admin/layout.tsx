@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Users, LogOut, Settings, Key, User, Building, UserCog, Layers } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
+import { Users, LogOut, Settings, Key, User, Building, UserCog, Layers, Globe } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminLayout({
@@ -11,10 +11,19 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [userName, setUserName] = useState<string | null>(null)
   const [isClient, setIsClient] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Función para determinar si un link está activo
+  const isActive = (path: string) => {
+    if (path === '/admin') {
+      return pathname === '/admin'
+    }
+    return pathname.startsWith(path)
+  }
 
   useEffect(() => {
     setIsClient(true)
@@ -24,8 +33,11 @@ export default function AdminLayout({
     const name = localStorage.getItem("userName")
     const isAdmin = localStorage.getItem("isAdmin")
 
-    if (!token || isAdmin !== "true") {
-      // Si no está logueado o no es admin, redirigir a login
+    // Permitir acceso a /admin/publicar sin verificar admin (la página misma establece el flag)
+    const isAdminPublicRoute = pathname === '/admin/publicar'
+
+    if (!token || (!isAdminPublicRoute && isAdmin !== "true")) {
+      // Si no está logueado o no es admin (y no es ruta pública), redirigir a login
       router.push("/login")
       return
     }
@@ -35,14 +47,16 @@ export default function AdminLayout({
     }
 
     setIsLoading(false)
-  }, [router])
+  }, [router, pathname])
 
   useEffect(() => {
     // Escuchar cambios en localStorage
     const updateAuthState = () => {
       const token = localStorage.getItem("token")
       const isAdmin = localStorage.getItem("isAdmin")
-      if (!token || isAdmin !== "true") {
+      const isAdminPublicRoute = pathname === '/admin/publicar'
+
+      if (!token || (!isAdminPublicRoute && isAdmin !== "true")) {
         router.push("/login")
       }
     }
@@ -54,7 +68,7 @@ export default function AdminLayout({
       window.removeEventListener("storage", updateAuthState)
       window.removeEventListener("auth-change", updateAuthState)
     }
-  }, [router])
+  }, [router, pathname])
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -88,40 +102,71 @@ export default function AdminLayout({
         <nav className="flex-1 p-4 space-y-2">
           <Link
             href="/admin"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive('/admin')
+                ? 'bg-primary text-white font-semibold'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            }`}
           >
             <Users className="h-5 w-5" />
             <span className="font-medium">Usuarios Registrados</span>
           </Link>
           <Link
             href="/admin/propiedades"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive('/admin/propiedades')
+                ? 'bg-primary text-white font-semibold'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            }`}
           >
             <Building className="h-5 w-5" />
             <span className="font-medium">Gestionar Propiedades</span>
           </Link>
           <Link
             href="/admin/asesores"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive('/admin/asesores')
+                ? 'bg-primary text-white font-semibold'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            }`}
           >
             <UserCog className="h-5 w-5" />
             <span className="font-medium">Asesores</span>
           </Link>
           <Link
             href="/admin/accesos"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive('/admin/accesos')
+                ? 'bg-primary text-white font-semibold'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            }`}
           >
             <Key className="h-5 w-5" />
             <span className="font-medium">Gestión de Accesos</span>
           </Link>
           <Link
             href="/admin/planes"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive('/admin/planes')
+                ? 'bg-primary text-white font-semibold'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            }`}
           >
             <Layers className="h-5 w-5" />
             <span className="font-medium">Planes de Suscripción</span>
           </Link>
         </nav>
+
+        {/* Ver Sitio - Link al sitio principal */}
+        <div className="p-4 border-t border-gray-800">
+          <Link
+            href="/"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <Globe className="h-5 w-5" />
+            <span className="font-medium">Ver Sitio</span>
+          </Link>
+        </div>
 
         {/* User Menu */}
         <div className="p-4 border-t border-gray-800 relative">

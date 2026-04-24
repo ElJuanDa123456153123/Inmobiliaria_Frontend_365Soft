@@ -72,6 +72,7 @@ export interface Advisor {
   email: string
   telefono?: string
   especialidad?: string
+  imagen_url?: string // Nueva: foto de perfil del asesor
   activo: boolean
   created_at: string
   updated_at: string
@@ -167,6 +168,7 @@ export interface CreateAdvisorRequest {
   email: string
   telefono?: string
   especialidad?: string
+  imagen_url?: string // Nueva: foto de perfil
   activo?: boolean
 }
 
@@ -175,6 +177,7 @@ export interface UpdateAdvisorRequest {
   email?: string
   telefono?: string
   especialidad?: string
+  imagen_url?: string // Nueva: foto de perfil
   activo?: boolean
 }
 
@@ -380,6 +383,38 @@ class AdminApiService {
     })
 
     return this.handleResponse<{ message: string; advisor: Advisor }>(response)
+  }
+
+  // ==================== NUEVOS: MÚLTIPLES ASESORES POR PROPIEDAD ====================
+
+  // Obtener todos los asesores asignados a una propiedad
+  async getPropertyAdvisors(propertyId: number): Promise<{ advisors: Advisor[]; total: number }> {
+    const response = await fetch(`${ADMIN_API_URL}/properties/${propertyId}/advisors`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse<{ advisors: Advisor[]; total: number }>(response)
+  }
+
+  // Asignar un asesor a una propiedad (soporta múltiples)
+  async assignAdvisorToProperty(propertyId: number, advisorId: number): Promise<{ message: string; advisor: Advisor }> {
+    const response = await fetch(`${ADMIN_API_URL}/properties/${propertyId}/advisors`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ advisor_id: advisorId }),
+    })
+
+    return this.handleResponse<{ message: string; advisor: Advisor }>(response)
+  }
+
+  // Eliminar un asesor de una propiedad
+  async removeAdvisorFromProperty(propertyId: number, advisorId: number): Promise<{ message: string }> {
+    const response = await fetch(`${ADMIN_API_URL}/properties/${propertyId}/advisors/${advisorId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse<{ message: string }>(response)
   }
 }
 

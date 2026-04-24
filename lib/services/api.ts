@@ -143,6 +143,20 @@ interface Property {
     orden: number
     principal: boolean
   }>
+  // Asesores asignados (múltiples)
+  asesores_asignados?: Array<{
+    id: number
+    property_id: number
+    advisor_id: number
+    asesor?: {
+      id: number
+      nombre: string
+      email: string
+      telefono?: string
+      especialidad?: string
+      imagen_url?: string
+    }
+  }>
 }
 
 class ApiService {

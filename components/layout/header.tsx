@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { Menu, X, User, Heart, LogOut, ChevronDown } from "lucide-react"
+import { Menu, X, User, Heart, LogOut, ChevronDown, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -14,6 +14,7 @@ export function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [publishMenuOpen, setPublishMenuOpen] = useState(false)
   const [userName, setUserName] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [isClient, setIsClient] = useState(false)
 
   // Verificar si estamos en la página /publicar
@@ -24,18 +25,23 @@ export function Header() {
     // Verificar si hay un usuario logueado
     const token = localStorage.getItem("token")
     const name = localStorage.getItem("userName")
+    const adminFlag = localStorage.getItem("isAdmin")
     if (token && name) {
       setUserName(name)
+      setIsAdmin(adminFlag === 'true')
     }
 
     // Función para actualizar el estado desde localStorage
     const updateAuthState = () => {
       const token = localStorage.getItem("token")
       const name = localStorage.getItem("userName")
+      const adminFlag = localStorage.getItem("isAdmin")
       if (token && name) {
         setUserName(name)
+        setIsAdmin(adminFlag === 'true')
       } else {
         setUserName(null)
+        setIsAdmin(false)
       }
     }
 
@@ -90,7 +96,9 @@ export function Header() {
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("userName")
+    localStorage.removeItem("isAdmin")
     setUserName(null)
+    setIsAdmin(false)
     setUserMenuOpen(false)
 
     // Disparar evento para notificar el cambio
@@ -181,6 +189,19 @@ export function Header() {
                       <Heart className="h-4 w-4" />
                       Favoritos
                     </Link>
+                    {isAdmin && (
+                      <>
+                        <hr className="my-2 border-border" />
+                        <Link
+                          href="/admin"
+                          className="flex items-center gap-3 px-4 py-2 text-sm text-primary hover:bg-muted transition-colors font-semibold"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Shield className="h-4 w-4" />
+                          Panel de Administrador
+                        </Link>
+                      </>
+                    )}
                     <hr className="my-2 border-border" />
                     <button
                       onClick={handleLogout}
@@ -318,6 +339,14 @@ export function Header() {
                       Favoritos
                     </Link>
                   </Button>
+                  {isAdmin && (
+                    <Button variant="ghost" asChild className="w-full justify-start text-primary">
+                      <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Panel de Administrador
+                      </Link>
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"

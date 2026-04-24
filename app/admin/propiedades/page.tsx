@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Building, CheckCircle, Clock, TrendingUp, Trash2, Edit, Eye, Star, Shield, ShieldCheck, MoreHorizontal, UserCog, X, CheckSquare, Square } from "lucide-react"
+import { Search, Building, CheckCircle, Clock, TrendingUp, Trash2, Edit, Eye, Star, Shield, ShieldCheck, MoreHorizontal, UserCog, X, CheckSquare, Square, User, Plus, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { adminApi, AdminProperty, Advisor } from "@/lib/services/admin-api"
 import { toast } from "sonner"
 import { PropertyBatchActions } from "@/components/admin/properties/PropertyBatchActions"
+import { getImageUrl } from "@/lib/utils"
 
 export default function AdminPropertiesPage() {
   const router = useRouter()
@@ -35,9 +36,12 @@ export default function AdminPropertiesPage() {
   // Estados para el modal de asignar asesor
   const [advisorModalOpen, setAdvisorModalOpen] = useState(false)
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null)
+  const [selectedProperty, setSelectedProperty] = useState<AdminProperty | null>(null)
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<number | null>(null)
   const [advisors, setAdvisors] = useState<Advisor[]>([])
+  const [assignedAdvisors, setAssignedAdvisors] = useState<Advisor[]>([]) // Asesores asignados a la propiedad
   const [loadingAdvisors, setLoadingAdvisors] = useState(false)
+  const [loadingAssignedAdvisors, setLoadingAssignedAdvisors] = useState(false)
 
   // Estados para selección en lote
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<number[]>([])
@@ -140,30 +144,68 @@ export default function AdminPropertiesPage() {
   const handleOpenAdvisorModal = async (propertyId: number) => {
     setSelectedPropertyId(propertyId)
     const property = properties.find(p => p.id === propertyId)
-    setSelectedAdvisorId(property?.advisor?.id || null)
+    setSelectedProperty(property || null)
 
     try {
       setLoadingAdvisors(true)
-      const data = await adminApi.listAdvisors({ activo: true })
-      setAdvisors(data.advisors)
+      setLoadingAssignedAdvisors(true)
+
+      // Cargar todos los asesores disponibles
+      const advisorsData = await adminApi.listAdvisors({ activo: true })
+      setAdvisors(advisorsData.advisors)
+
+      // Cargar asesores ya asignados a esta propiedad
+      const assignedData = await adminApi.getPropertyAdvisors(propertyId)
+      setAssignedAdvisors(assignedData.advisors)
+
       setAdvisorModalOpen(true)
     } catch (error: any) {
       toast.error(error.message || "Error al cargar asesores")
     } finally {
       setLoadingAdvisors(false)
+      setLoadingAssignedAdvisors(false)
     }
   }
 
   const handleAssignAdvisor = async () => {
-    if (!selectedPropertyId) return
+    if (!selectedPropertyId || !selectedAdvisorId) {
+      toast.error("Selecciona un asesor")
+      return
+    }
+
+    // Verificar si ya está asignado
+    if (assignedAdvisors.some(a => a.id === selectedAdvisorId)) {
+      toast.error("Este asesor ya está asignado a esta propiedad")
+      return
+    }
 
     try {
-      await adminApi.assignAdvisor(selectedPropertyId, selectedAdvisorId)
-      toast.success(selectedAdvisorId ? "Asesor asignado correctamente" : "Asesor removido correctamente")
-      setAdvisorModalOpen(false)
+      await adminApi.assignAdvisorToProperty(selectedPropertyId, selectedAdvisorId)
+      toast.success("Asesor asignado correctamente")
+
+      // Recargar asesores asignados
+      const assignedData = await adminApi.getPropertyAdvisors(selectedPropertyId)
+      setAssignedAdvisors(assignedData.advisors)
+
+      setSelectedAdvisorId(null)
       fetchProperties()
     } catch (error: any) {
       toast.error(error.message || "Error al asignar asesor")
+    }
+  }
+
+  const handleRemoveAdvisor = async (advisorId: number) => {
+    if (!selectedPropertyId) return
+
+    try {
+      await adminApi.removeAdvisorFromProperty(selectedPropertyId, advisorId)
+      toast.success("Asesor eliminado de la propiedad")
+
+      // Actualizar lista de asesores asignados
+      setAssignedAdvisors(prev => prev.filter(a => a.id !== advisorId))
+      fetchProperties()
+    } catch (error: any) {
+      toast.error(error.message || "Error al eliminar asesor")
     }
   }
 
@@ -235,7 +277,7 @@ export default function AdminPropertiesPage() {
           <p className="text-muted-foreground mt-2">Administra todas las propiedades de la plataforma</p>
         </div>
         <Button
-          onClick={() => router.push('/admin/propiedades/crear')}
+          onClick={() => router.push('/admin/publicar')}
           className="bg-primary hover:bg-primary/90"
         >
           <Building className="h-4 w-4 mr-2" />
@@ -532,53 +574,177 @@ export default function AdminPropertiesPage() {
         onRefresh={fetchProperties}
       />
 
-      {/* Modal para asignar asesor */}
+      {/* Modal para asignar asesores */}
       <Dialog open={advisorModalOpen} onOpenChange={setAdvisorModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCog className="h-5 w-5" />
-              Asignar Asesor
+              Gestionar Asesores de la Propiedad
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="advisor">Seleccionar Asesor</Label>
-              <Select
-                value={selectedAdvisorId?.toString() || "none"}
-                onValueChange={(value) => setSelectedAdvisorId(value === "none" ? null : Number(value))}
-              >
-                <SelectTrigger id="advisor">
-                  <SelectValue placeholder={loadingAdvisors ? "Cargando asesores..." : "Seleccionar asesor"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asesor</SelectItem>
-                  {advisors.map((advisor) => (
-                    <SelectItem key={advisor.id} value={advisor.id.toString()}>
-                      {advisor.nombre}
-                      {advisor.especialidad && (
-                        <span className="text-muted-foreground text-xs ml-2">
-                          ({advisor.especialidad})
-                        </span>
+
+          <div className="space-y-6 py-4">
+            {/* Información de la propiedad y usuario dueño */}
+            {selectedProperty && (
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div>
+                  <h3 className="font-semibold text-sm text-muted-foreground mb-1">Propiedad</h3>
+                  <p className="font-medium">{selectedProperty.titulo}</p>
+                </div>
+
+                <div className="flex items-start gap-3 pt-2 border-t border-border">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm text-muted-foreground mb-1">Publicado por</h3>
+                    <p className="font-medium truncate">{selectedProperty.vendedor_nombre}</p>
+                    {selectedProperty.user && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                        <Mail className="h-3 w-3" />
+                        <span className="truncate">{selectedProperty.user.email}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Asesores ya asignados */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <UserCog className="h-4 w-4" />
+                Asesores Asignados ({assignedAdvisors.length})
+              </h3>
+
+              {loadingAssignedAdvisors ? (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  Cargando asesores asignados...
+                </div>
+              ) : assignedAdvisors.length === 0 ? (
+                <div className="text-center py-6 border-2 border-dashed border-border rounded-lg">
+                  <User className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    No hay asesores asignados a esta propiedad
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {assignedAdvisors.map((advisor) => (
+                    <div
+                      key={advisor.id}
+                      className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg group"
+                    >
+                      {/* Foto del asesor */}
+                      {advisor.imagen_url ? (
+                        <img
+                          src={getImageUrl(advisor.imagen_url) || advisor.imagen_url}
+                          alt={advisor.nombre}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-border"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-6 w-6 text-primary" />
+                        </div>
                       )}
-                    </SelectItem>
+
+                      {/* Información del asesor */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{advisor.nombre}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          {advisor.especialidad && (
+                            <span className="truncate">{advisor.especialidad}</span>
+                          )}
+                          {advisor.telefono && (
+                            <>
+                              <span>•</span>
+                              <span className="truncate">{advisor.telefono}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Botón eliminar */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveAdvisor(advisor.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Asigna un asesor a esta propiedad. El asesor podrá gestionar la propiedad.
-              </p>
+                </div>
+              )}
+            </div>
+
+            {/* Agregar nuevo asesor */}
+            <div className="space-y-3 pt-4 border-t border-border">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Agregar Nuevo Asesor
+              </h3>
+
+              <div className="flex gap-2">
+                <Select
+                  value={selectedAdvisorId?.toString() || ""}
+                  onValueChange={(value) => setSelectedAdvisorId(value ? Number(value) : null)}
+                  disabled={loadingAdvisors}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder={loadingAdvisors ? "Cargando asesores..." : "Seleccionar asesor"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {advisors
+                      .filter(a => !assignedAdvisors.some(assigned => assigned.id === a.id))
+                      .map((advisor) => (
+                        <SelectItem key={advisor.id} value={advisor.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            {advisor.imagen_url && (
+                              <img
+                                src={getImageUrl(advisor.imagen_url) || advisor.imagen_url}
+                                alt={advisor.nombre}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            )}
+                            <span>{advisor.nombre}</span>
+                            {advisor.especialidad && (
+                              <span className="text-muted-foreground text-xs ml-1">
+                                ({advisor.especialidad})
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  onClick={handleAssignAdvisor}
+                  disabled={!selectedAdvisorId}
+                  className="shrink-0"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Agregar
+                </Button>
+              </div>
+
+              {advisors.filter(a => !assignedAdvisors.some(assigned => assigned.id === a.id)).length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Todos los asesores activos ya están asignados a esta propiedad.
+                </p>
+              )}
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+
+          <div className="flex justify-end pt-4 border-t border-border">
             <Button
               variant="outline"
               onClick={() => setAdvisorModalOpen(false)}
             >
-              Cancelar
-            </Button>
-            <Button onClick={handleAssignAdvisor}>
-              Guardar
+              Cerrar
             </Button>
           </div>
         </DialogContent>

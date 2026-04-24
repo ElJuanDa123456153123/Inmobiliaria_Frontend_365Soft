@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, UserCog, CheckCircle, XCircle, Trash2, Edit, Plus } from "lucide-react"
+import { Search, UserCog, CheckCircle, XCircle, Trash2, Edit, Plus, User, Camera, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { adminApi, Advisor } from "@/lib/services/admin-api"
 import { toast } from "sonner"
 
@@ -20,11 +20,13 @@ export default function AdminAdvisorsPage() {
   // Estados para el modal de crear asesor
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
+  const [imagenPreview, setImagenPreview] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     nombre: "",
     email: "",
     telefono: "",
     especialidad: "",
+    imagen_url: "",
     activo: true,
   })
 
@@ -79,8 +81,10 @@ export default function AdminAdvisorsPage() {
       email: "",
       telefono: "",
       especialidad: "",
+      imagen_url: "",
       activo: true,
     })
+    setImagenPreview(null)
     setCreateModalOpen(true)
   }
 
@@ -108,16 +112,95 @@ export default function AdminAdvisorsPage() {
         email: formData.email,
         telefono: formData.telefono || undefined,
         especialidad: formData.especialidad || undefined,
+        imagen_url: formData.imagen_url || undefined,
         activo: formData.activo,
       })
       toast.success("Asesor creado exitosamente")
       setCreateModalOpen(false)
+      setImagenPreview(null)
       fetchAdvisors()
     } catch (error: any) {
       toast.error(error.message || "Error al crear asesor")
     } finally {
       setCreateLoading(false)
     }
+  }
+
+  const handleImagenUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar que sea una imagen
+    if (!file.type.startsWith('image/')) {
+      toast.error('El archivo debe ser una imagen')
+      return
+    }
+
+    // Validar tamaño (max 2MB para evitar problemas)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('La imagen no puede superar los 2MB')
+      return
+    }
+
+    try {
+      // Comprimir imagen usando canvas
+      const img = new Image()
+      const reader = new FileReader()
+
+      reader.onload = (event) => {
+        img.src = event.target?.result as string
+      }
+
+      img.onload = () => {
+        // Crear canvas para redimensionar
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+
+        if (!ctx) {
+          toast.error('Error al procesar la imagen')
+          return
+        }
+
+        // Limitar dimensiones a 300x300 (suficiente para avatar)
+        const maxSize = 300
+        let width = img.width
+        let height = img.height
+
+        if (width > height) {
+          if (width > maxSize) {
+            height = (height * maxSize) / width
+            width = maxSize
+          }
+        } else {
+          if (height > maxSize) {
+            width = (width * maxSize) / height
+            height = maxSize
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        // Dibujar imagen redimensionada
+        ctx.drawImage(img, 0, 0, width, height)
+
+        // Convertir a base64 con calidad reducida (0.7)
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7)
+        const base64Data = compressedBase64.split(',')[1]
+
+        setFormData({ ...formData, imagen_url: base64Data })
+        setImagenPreview(compressedBase64)
+      }
+
+      reader.readAsDataURL(file)
+    } catch (error) {
+      toast.error('Error al procesar la imagen')
+    }
+  }
+
+  const handleRemoveImagen = () => {
+    setFormData({ ...formData, imagen_url: "" })
+    setImagenPreview(null)
   }
 
   const filteredAdvisors = advisors.filter(advisor =>
@@ -289,6 +372,9 @@ export default function AdminAdvisorsPage() {
               <UserCog className="h-5 w-5" />
               Nuevo Asesor
             </DialogTitle>
+            <DialogDescription>
+              Completa el formulario para registrar un nuevo asesor inmobiliario en el sistema.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateAdvisor} className="space-y-4 py-4">
             {/* Nombre */}
@@ -302,6 +388,65 @@ export default function AdminAdvisorsPage() {
                 onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                 required
               />
+            </div>
+
+            {/* Foto de perfil */}
+            <div className="space-y-2">
+              <Label>Foto de Perfil</Label>
+              <div className="flex items-center gap-4">
+                {/* Preview circular */}
+                <div className="relative w-24 h-24">
+                  {imagenPreview ? (
+                    <img
+                      src={imagenPreview}
+                      alt="Preview"
+                      className="w-full h-full rounded-full object-cover border-4 border-border shadow-md"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-muted border-4 border-border flex items-center justify-center">
+                      <User className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Controles */}
+                <div className="flex-1 space-y-2">
+                  <div>
+                    <input
+                      type="file"
+                      id="imagen"
+                      accept="image/*"
+                      onChange={handleImagenUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById('imagen')?.click()}
+                      className="w-full"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Subir Foto
+                    </Button>
+                  </div>
+                  {imagenPreview && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveImagen}
+                      className="w-full text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Eliminar Foto
+                    </Button>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Formatos: JPG, PNG, WEBP. Máximo 2MB (se redimensionará automáticamente)
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Email */}

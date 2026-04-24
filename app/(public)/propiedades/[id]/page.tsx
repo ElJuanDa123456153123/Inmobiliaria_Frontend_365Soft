@@ -18,6 +18,8 @@ import {
   ChevronRight,
   Loader2,
   ExternalLink,
+  UserCog,
+  User,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Header } from "@/components/layout/header"
@@ -431,6 +433,71 @@ export default function PropertyDetailPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Asesores Asignados */}
+                  {property.asesores_asignados && property.asesores_asignados.length > 0 && (
+                    <div className="bg-card rounded-xl p-6 shadow-lg border border-border">
+                      <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                        <UserCog className="h-5 w-5 text-primary" />
+                        Asesores Asignados
+                      </h3>
+
+                      <div className="space-y-4">
+                        {property.asesores_asignados.map((asignacion) => {
+                          const asesor = asignacion.asesor
+                          if (!asesor) return null
+
+                          return (
+                            <div
+                              key={asignacion.id}
+                              className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
+                            >
+                              {/* Foto del asesor */}
+                              {asesor.imagen_url ? (
+                                <img
+                                  src={getImageUrl(asesor.imagen_url) || asesor.imagen_url}
+                                  alt={asesor.nombre}
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-border flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                  <User className="h-6 w-6 text-primary" />
+                                </div>
+                              )}
+
+                              {/* Información del asesor */}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm">{asesor.nombre}</p>
+                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
+                                  {asesor.especialidad && (
+                                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                      {asesor.especialidad}
+                                    </span>
+                                  )}
+                                  {asesor.telefono && (
+                                    <span className="flex items-center gap-1">
+                                      <Phone className="h-3 w-3" />
+                                      {asesor.telefono}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Botón de contacto */}
+                              {asesor.telefono && (
+                                <Button size="sm" variant="outline" asChild>
+                                  <a href={`tel:${asesor.telefono}`}>
+                                    <Phone className="h-3 w-3 mr-1" />
+                                    Llamar
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Publication Date */}
                   {property.fecha_publicacion && (

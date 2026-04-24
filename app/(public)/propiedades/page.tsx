@@ -17,11 +17,11 @@ import { PropertyCard } from "@/components/home/property-card"
 import {
   listProperties,
   searchProperties,
-  getMainImageUrl,
   formatPrice,
   type Property,
   type ListPropertiesParams
 } from "@/lib/properties-api"
+import { getImageUrl } from "@/lib/utils"
 
 const propertyTypes = [
   { value: "todas", label: "Todas" },
@@ -407,7 +407,11 @@ export default function PropiedadesPage() {
                       bedrooms={property.dormitorios}
                       bathrooms={property.banos}
                       area={`${property.metros_edificados}m²`}
-                      image={getMainImageUrl(property)}
+                      image={
+                        property.property_images && property.property_images.length > 0
+                          ? getImageUrl(property.property_images.find(img => img.principal)?.image_url || property.property_images[0].image_url) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
+                          : "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
+                      }
                       publishedDate={new Date(property.created_at).toLocaleDateString('es-BO')}
                       featured={property.destacado}
                     />
