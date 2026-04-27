@@ -1,84 +1,164 @@
-import { PropertyCard } from "./property-card"
+"use client"
 
-// Datos de ejemplo - después vendrán de la API
-const featuredProperties = [
-  {
-    id: "1",
-    title: "Residencia de Lujo en Urubó",
-    location: "Santa Cruz, Zona Urubó",
-    price: "$450,000",
-    operationType: "venta" as const,
-    bedrooms: 4,
-    bathrooms: 3,
-    area: "350m²",
-    image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop",
-    publishedDate: "2 días",
-    featured: true,
-  },
-  {
-    id: "2",
-    title: "Departamento Moderno",
-    location: "La Paz, Achumani",
-    price: "$1,200/mes",
-    operationType: "alquiler" as const,
-    bedrooms: 2,
-    bathrooms: 2,
-    area: "120m²",
-    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=600&fit=crop",
-    publishedDate: "1 semana",
-  },
-  {
-    id: "3",
-    title: "Casa Familiar",
-    location: "Cochabamba, Cala Cala",
-    price: "Bs 8,000 Anticrético",
-    operationType: "anticretico" as const,
-    bedrooms: 3,
-    bathrooms: 2,
-    area: "200m²",
-    image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=600&fit=crop",
-    publishedDate: "3 días",
-    featured: true,
-  },
-  {
-    id: "4",
-    title: "Penthouse con Vista",
-    location: "Santa Cruz, Equipetrol",
-    price: "$280,000",
-    operationType: "venta" as const,
-    bedrooms: 3,
-    bathrooms: 2,
-    area: "180m²",
-    image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&h=600&fit=crop",
-    publishedDate: "5 días",
-  },
-  {
-    id: "5",
-    title: "Loft Industrial",
-    location: "La Paz, Sopocachi",
-    price: "$850/mes",
-    operationType: "alquiler" as const,
-    bedrooms: 1,
-    bathrooms: 1,
-    area: "85m²",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop",
-    publishedDate: "1 día",
-  },
-  {
-    id: "6",
-    title: "Casa con Jardín",
-    location: "Cochabamba, Cota Cota",
-    price: "$195,000",
-    operationType: "venta" as const,
-    bedrooms: 4,
-    bathrooms: 3,
-    area: "280m²",
-    image: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&h=600&fit=crop",
-    publishedDate: "4 días",
-  },
-]
+import { useEffect, useState } from "react"
+import { PropertyCard } from "./property-card"
+import { apiService, Property } from "@/lib/services/api"
+import { Loader2 } from "lucide-react"
+import { getImageUrl } from "@/lib/utils"
 
 export function FeaturedProperties() {
+  const [properties, setProperties] = useState<Property[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadProperties = async () => {
+      try {
+        // Cargar propiedades activas desde el backend
+        const response = await apiService.listProperties({
+          estado: "activo",  // Solo propiedades activas
+          limite: 6,         // Máximo 6 propiedades
+        })
+
+        setProperties(response.propiedades)
+      } catch (err) {
+        console.error('Error cargando propiedades:', err)
+        setError('Error al cargar propiedades')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProperties()
+  }, [])
+
+  // Formatear precio para mostrar
+  const formatPrice = (property: Property) => {
+    const precio = property.precio
+    const moneda = property.moneda === 'BOB' ? 'Bs' : '$'
+
+    if (property.tipo_operacion === 'alquiler') {
+      return `${moneda} ${precio.toLocaleString()}/mes`
+    } else if (property.tipo_operacion === 'anticretico') {
+      return `${moneda} ${precio.toLocaleString()} Anticrético`
+    } else {
+      return `${moneda} ${precio.toLocaleString()}`
+    }
+  }
+
+  // Calcular tiempo de publicación
+  const getTimeAgo = (fecha: string) => {
+    const date = new Date(fecha)
+    const now = new Date()
+    const diffTime = Math.abs(now.getTime() - date.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 1) return 'Hoy'
+    if (diffDays < 7) return `${diffDays} días`
+    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} semanas`
+    return `${Math.ceil(diffDays / 30)} meses`
+  }
+
+  // Convertir propiedad del backend al formato que espera PropertyCard
+  const formatProperty = (property: Property) => {
+    // Obtener la imagen principal (primera imagen o la marcada como principal)
+    const mainImage = property.imagenes && property.imagenes.length > 0
+      ? property.imagenes.find(img => img.principal) || property.imagenes[0]
+      : null
+
+    // Usar getImageUrl() para convertir la URL del backend a una URL completa válida
+    const imageUrl = mainImage?.image_url
+
+    // Debug: Log para ver qué está llegando
+    console.log('Property:', property.titulo, 'Image URL:', imageUrl, 'Main image:', mainImage)
+
+    const image = getImageUrl(imageUrl) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
+
+    console.log('Final image URL:', image)
+
+    return {
+      id: property.id.toString(),
+      title: property.titulo,
+      location: property.zona,
+      price: formatPrice(property),
+      operationType: property.tipo_operacion as "venta" | "alquiler" | "anticretico",
+      bedrooms: parseInt(property.dormitorios) || 0,
+      bathrooms: parseInt(property.banos) || 0,
+      area: `${property.metros_edificados}m²`,
+      image: image,
+      publishedDate: property.fecha_publicacion ? getTimeAgo(property.fecha_publicacion) : 'Reciente',
+      featured: property.destacado,
+    }
+  }
+
+  if (loading) {
+    return (
+      <section className="py-16 bg-background">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Propiedades Destacadas
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              Las mejores oportunidades inmobiliarias seleccionadas para ti
+            </p>
+          </div>
+
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="py-16 bg-background">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Propiedades Destacadas
+            </h2>
+          </div>
+
+          <div className="text-center py-20">
+            <p className="text-red-500">{error}</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Asegúrate de que el backend esté corriendo
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (properties.length === 0) {
+    return (
+      <section className="py-16 bg-background">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Propiedades Destacadas
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              Las mejores oportunidades inmobiliarias seleccionadas para ti
+            </p>
+          </div>
+
+          <div className="text-center py-20">
+            <p className="text-gray-500 text-lg">
+              No hay propiedades activas en este momento
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              ¡Sé el primero en publicar una propiedad!
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="py-16 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -92,9 +172,10 @@ export function FeaturedProperties() {
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredProperties.map((property) => (
-            <PropertyCard key={property.id} {...property} />
-          ))}
+          {properties.map((property) => {
+            const formatted = formatProperty(property)
+            return <PropertyCard key={property.id} {...formatted} />
+          })}
         </div>
 
         <div className="mt-12 text-center">

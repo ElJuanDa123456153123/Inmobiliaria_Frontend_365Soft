@@ -2,35 +2,46 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Menu, X, User, Heart, LogOut, ChevronDown } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
+import { Menu, X, User, Heart, LogOut, ChevronDown, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 export function Header() {
   const router = useRouter()
+  const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [publishMenuOpen, setPublishMenuOpen] = useState(false)
   const [userName, setUserName] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [isClient, setIsClient] = useState(false)
+
+  // Verificar si estamos en la página /publicar
+  const isPublicarPage = pathname?.startsWith("/publicar")
 
   useEffect(() => {
     setIsClient(true)
     // Verificar si hay un usuario logueado
     const token = localStorage.getItem("token")
     const name = localStorage.getItem("userName")
+    const adminFlag = localStorage.getItem("isAdmin")
     if (token && name) {
       setUserName(name)
+      setIsAdmin(adminFlag === 'true')
     }
 
     // Función para actualizar el estado desde localStorage
     const updateAuthState = () => {
       const token = localStorage.getItem("token")
       const name = localStorage.getItem("userName")
+      const adminFlag = localStorage.getItem("isAdmin")
       if (token && name) {
         setUserName(name)
+        setIsAdmin(adminFlag === 'true')
       } else {
         setUserName(null)
+        setIsAdmin(false)
       }
     }
 
@@ -66,10 +77,28 @@ export function Header() {
     }
   }, [userMenuOpen])
 
+  // Cerrar el dropdown de publicación cuando se hace click fuera de él
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      const publishMenu = target.closest(".publish-menu-container")
+      if (!publishMenu && publishMenuOpen) {
+        setPublishMenuOpen(false)
+      }
+    }
+
+    if (publishMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+      return () => document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [publishMenuOpen])
+
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("userName")
+    localStorage.removeItem("isAdmin")
     setUserName(null)
+    setIsAdmin(false)
     setUserMenuOpen(false)
 
     // Disparar evento para notificar el cambio
@@ -160,6 +189,19 @@ export function Header() {
                       <Heart className="h-4 w-4" />
                       Favoritos
                     </Link>
+                    {isAdmin && (
+                      <>
+                        <hr className="my-2 border-border" />
+                        <Link
+                          href="/admin"
+                          className="flex items-center gap-3 px-4 py-2 text-sm text-primary hover:bg-muted transition-colors font-semibold"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Shield className="h-4 w-4" />
+                          Panel de Administrador
+                        </Link>
+                      </>
+                    )}
                     <hr className="my-2 border-border" />
                     <button
                       onClick={handleLogout}
@@ -180,9 +222,79 @@ export function Header() {
               </Button>
             </>
           )}
-          <Button variant="default" asChild>
-            <Link href="/publicar">Publica tu Propiedad</Link>
-          </Button>
+          {/* Dropdown "Publica tu Propiedad" */}
+          <div className="relative publish-menu-container">
+            <Button
+              variant="default"
+              onClick={() => setPublishMenuOpen(!publishMenuOpen)}
+              className="flex items-center gap-2"
+            >
+              Publica tu Propiedad
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+
+            {publishMenuOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-border py-2 z-50">
+                {isPublicarPage ? (
+                  <>
+                    {/* Opciones cuando está en /publicar */}
+                    <Link
+                      href="/publicar/inmobiliaria"
+                      className="block px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setPublishMenuOpen(false)}
+                    >
+                      <div className="font-medium">Inmobiliaria</div>
+                      <div className="text-xs text-muted-foreground mt-1">Publica como inmobiliaria</div>
+                    </Link>
+                    <Link
+                      href="/publicar/proyecto"
+                      className="block px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setPublishMenuOpen(false)}
+                    >
+                      <div className="font-medium">Proyecto</div>
+                      <div className="text-xs text-muted-foreground mt-1">Publica un proyecto nuevo</div>
+                    </Link>
+                    <Link
+                      href="/publicar/particular"
+                      className="block px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setPublishMenuOpen(false)}
+                    >
+                      <div className="font-medium">Particular</div>
+                      <div className="text-xs text-muted-foreground mt-1">Publica como particular</div>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    {/* Opciones cuando NO está en /publicar */}
+                    <Link
+                      href="/publicar?tipo=dueño-vende"
+                      className="block px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setPublishMenuOpen(false)}
+                    >
+                      <div className="font-medium">Dueño Vende</div>
+                      <div className="text-xs text-muted-foreground mt-1">Vende tu propiedad</div>
+                    </Link>
+                    <Link
+                      href="/publicar?tipo=dueño-alquila-anual"
+                      className="block px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setPublishMenuOpen(false)}
+                    >
+                      <div className="font-medium">Dueño Alquila Anual</div>
+                      <div className="text-xs text-muted-foreground mt-1">Alquila por largo plazo</div>
+                    </Link>
+                    <Link
+                      href="/publicar?tipo=dueño-alquila-temporario"
+                      className="block px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setPublishMenuOpen(false)}
+                    >
+                      <div className="font-medium">Dueño Alquila Temporario</div>
+                      <div className="text-xs text-muted-foreground mt-1">Alquila por temporadas</div>
+                    </Link>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -227,6 +339,14 @@ export function Header() {
                       Favoritos
                     </Link>
                   </Button>
+                  {isAdmin && (
+                    <Button variant="ghost" asChild className="w-full justify-start text-primary">
+                      <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Panel de Administrador
+                      </Link>
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -249,11 +369,66 @@ export function Header() {
                   </Button>
                 </>
               )}
-              <Button variant="default" asChild className="w-full">
-                <Link href="/publicar" onClick={() => setMobileMenuOpen(false)}>
-                  Publica tu Propiedad
-                </Link>
-              </Button>
+              <div className="space-y-2">
+                <Button variant="default" asChild className="w-full">
+                  <Link href="/publicar" onClick={() => setMobileMenuOpen(false)}>
+                    Publica tu Propiedad
+                  </Link>
+                </Button>
+                <div className="pl-4 space-y-1">
+                  {isPublicarPage ? (
+                    <>
+                      {/* Opciones cuando está en /publicar - móvil */}
+                      <Link
+                        href="/publicar/inmobiliaria"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-muted rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Inmobiliaria
+                      </Link>
+                      <Link
+                        href="/publicar/proyecto"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-muted rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Proyecto
+                      </Link>
+                      <Link
+                        href="/publicar/particular"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-muted rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Particular
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      {/* Opciones cuando NO está en /publicar - móvil */}
+                      <Link
+                        href="/publicar?tipo=dueño-vende"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-muted rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Dueño Vende
+                      </Link>
+                      <Link
+                        href="/publicar?tipo=dueño-alquila-anual"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-muted rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Dueño Alquila Anual
+                      </Link>
+                      <Link
+                        href="/publicar?tipo=dueño-alquila-temporario"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-muted rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Dueño Alquila Temporario
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
