@@ -2,6 +2,7 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import UnderlineExtension from '@tiptap/extension-underline'
 import {
   Bold,
   Italic,
@@ -32,6 +33,7 @@ export default function EditorDescripcion({
           levels: [1, 2],
         },
       }),
+      UnderlineExtension,
     ],
     content: value,
     onUpdate: ({ editor }) => {

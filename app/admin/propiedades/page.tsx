@@ -69,7 +69,7 @@ export default function AdminPropertiesPage() {
         search: searchTerm || undefined,
       }
       const data = await adminApi.listProperties(cleanFilters)
-      setProperties(data.properties)
+      setProperties(data.properties || [])
     } catch (error: any) {
       toast.error(error.message || "Error al cargar propiedades")
     } finally {
@@ -229,10 +229,10 @@ export default function AdminPropertiesPage() {
     setSelectedPropertyIds([])
   }
 
-  const filteredProperties = properties.filter(property =>
-    property.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    property.zona.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    property.vendedor_nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProperties = (properties || []).filter(property =>
+    (property.titulo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (property.zona || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (property.vendedor_nombre || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   // Pagination logic

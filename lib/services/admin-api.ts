@@ -1,4 +1,5 @@
-const ADMIN_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/admin'
+const BASE_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+const ADMIN_API_URL = `${BASE_API_URL}/admin`
 
 // ==================== INTERFACES ====================
 
