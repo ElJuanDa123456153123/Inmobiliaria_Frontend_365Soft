@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Search, SlidersHorizontal, MapPin, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { useState, useEffect, useMemo, Suspense } from "react"
+import { Search, SlidersHorizontal, MapPin, ChevronLeft, ChevronRight, Loader2, Map as MapIcon, List as ListIcon, Columns } from "lucide-react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -22,6 +23,20 @@ import {
   type ListPropertiesParams
 } from "@/lib/properties-api"
 import { getImageUrl } from "@/lib/utils"
+import dynamic from "next/dynamic"
+
+// Cargar el mapa dinámicamente para evitar errores de SSR con Leaflet
+const PropertySearchMap = dynamic(
+  () => import("@/components/mapa/PropertySearchMap"),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full bg-muted animate-pulse flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+)
 
 const propertyTypes = [
   { value: "todas", label: "Todas" },
@@ -36,6 +51,7 @@ const operationTypes = [
   { value: "todas", label: "Todas" },
   { value: "venta", label: "Venta" },
   { value: "alquiler", label: "Alquiler" },
+  { value: "anticretico", label: "Anticrético" },
 ]
 
 const bedroomsOptions = [
@@ -53,19 +69,26 @@ const currencies = [
   { value: "BOB", label: "Bs" },
 ]
 
-export default function PropiedadesPage() {
+type ViewMode = 'list' | 'map' | 'split'
+
+function PropiedadesContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
   const [properties, setProperties] = useState<Property[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [useFullTextSearch, setUseFullTextSearch] = useState(false)
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || "")
+  const [useFullTextSearch, setUseFullTextSearch] = useState(!!searchParams.get('search'))
   const [showFilters, setShowFilters] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('split')
 
   const [filters, setFilters] = useState({
-    operation: "todas",
-    type: "todas",
+    operation: searchParams.get('operation') || "todas",
+    type: searchParams.get('type') || "todas",
+    zona: searchParams.get('zona') || "",
     bedrooms: "todas",
     priceMin: "",
     priceMax: "",
@@ -76,6 +99,68 @@ export default function PropiedadesPage() {
     order: "desc",
   })
 
+  // Sincronizar filtros desde la URL cuando cambia
+  useEffect(() => {
+    const operation = searchParams.get('operation')
+    const type = searchParams.get('type')
+    const search = searchParams.get('search')
+    const zona = searchParams.get('zona')
+
+    if (operation || type || search || zona) {
+      setFilters(prev => ({
+        ...prev,
+        operation: operation || prev.operation,
+        type: type || prev.type,
+        zona: zona || prev.zona,
+      }))
+      if (search) {
+        setSearchTerm(search)
+        setUseFullTextSearch(true)
+      } else if (zona) {
+        // Si hay zona pero no búsqueda, podemos poner la zona en el input para que el usuario la vea
+        setSearchTerm(zona)
+      }
+      setPage(1)
+    }
+  }, [searchParams])
+
+  // Ajustar viewMode según el tamaño de la pantalla
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024 && viewMode === 'split') {
+        setViewMode('list')
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    handleResize()
+    return () => window.removeEventListener('resize', handleResize)
+  }, [viewMode])
+
+  // Coordenadas de ciudades para centrar el mapa
+  const mapCenter = useMemo((): [number, number] | undefined => {
+    if (!filters.zona) return undefined
+
+    const cityCoords: Record<string, [number, number]> = {
+      'Santa Cruz': [-17.7833, -63.1821],
+      'La Paz': [-16.4897, -68.1193],
+      'Cochabamba': [-17.3895, -66.1568],
+      'El Alto': [-16.5000, -68.1833],
+      'Sucre': [-19.0333, -65.2627],
+      'Oruro': [-17.9833, -67.1500],
+      'Tarija': [-21.5354, -64.7296],
+      'Potosí': [-19.5833, -65.7500],
+      'Beni': [-14.8333, -64.9000],
+      'Pando': [-11.0167, -68.7667],
+    }
+
+    // Buscar coincidencia exacta o parcial
+    const foundCity = Object.keys(cityCoords).find(city => 
+      filters.zona.toLowerCase().includes(city.toLowerCase())
+    )
+
+    return foundCity ? cityCoords[foundCity] : undefined
+  }, [filters.zona])
+
   // Cargar propiedades
   useEffect(() => {
     loadProperties()
@@ -84,9 +169,12 @@ export default function PropiedadesPage() {
   async function loadProperties() {
     setLoading(true)
     try {
+      // Para el modo mapa/split, podríamos querer cargar más resultados
+      const limit = viewMode === 'list' ? 12 : 24
+
       let params: ListPropertiesParams = {
         page,
-        limit: 12,
+        limit,
         order_by: filters.orderBy as any,
         order: filters.order as any,
       }
@@ -97,6 +185,9 @@ export default function PropiedadesPage() {
       }
       if (filters.type !== "todas") {
         params.tipo_propiedad = filters.type
+      }
+      if (filters.zona) {
+        params.zona = filters.zona
       }
       if (filters.bedrooms !== "todas") {
         params.dormitorios = filters.bedrooms
@@ -117,12 +208,17 @@ export default function PropiedadesPage() {
         params.metros_max = parseFloat(filters.metrosMax)
       }
 
-      // Usar búsqueda full-text si hay un término de búsqueda
-      if (searchTerm.trim().length >= 2 && useFullTextSearch) {
+      // Hack: Si buscan la ciudad principal, usamos la búsqueda normal (listProperties)
+      // porque la base de datos no tiene la ciudad en los campos de texto
+      const lowerSearch = searchTerm.trim().toLowerCase();
+      const isCitySearchOnly = lowerSearch === "santa cruz" || lowerSearch === "santa cruz de la sierra";
+
+      // Usar búsqueda full-text si hay un término de búsqueda específico
+      if (searchTerm.trim().length >= 2 && useFullTextSearch && !isCitySearchOnly) {
         const searchResults = await searchProperties({
           q: searchTerm,
           page,
-          limit: 12,
+          limit,
           ...(filters.operation !== "todas" && { tipo_operacion: filters.operation }),
           ...(filters.type !== "todas" && { tipo_propiedad: filters.type }),
           ...(filters.moneda !== "todas" && { moneda: filters.moneda }),
@@ -148,7 +244,6 @@ export default function PropiedadesPage() {
       }
     } catch (error) {
       console.error("Error loading properties:", error)
-      // TODO: Mostrar error al usuario
     } finally {
       setLoading(false)
     }
@@ -173,6 +268,7 @@ export default function PropiedadesPage() {
     setFilters({
       operation: "todas",
       type: "todas",
+      zona: "",
       bedrooms: "todas",
       priceMin: "",
       priceMax: "",
@@ -189,303 +285,285 @@ export default function PropiedadesPage() {
   // Cambiar página
   const changePage = (newPage: number) => {
     setPage(newPage)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    if (viewMode !== 'split') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
       <Header />
 
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-12">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-foreground sm:text-5xl">
-                Propiedades en Bolivia
-              </h1>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Encuentra la propiedad perfecta entre {total.toLocaleString()} opciones
-              </p>
-            </div>
-
-            {/* Search Bar */}
-            <div className="max-w-3xl mx-auto">
-              <div className="relative">
+      {/* Toolbar / Filters Area */}
+      <div className="flex-none border-b border-border bg-card z-20">
+        <div className="mx-auto max-w-[1600px] px-4 py-3">
+          <div className="flex flex-col md:flex-row items-center gap-3">
+            {/* Search Input */}
+            <div className="flex flex-col gap-1 w-full md:w-80">
+              <span className="text-xs text-muted-foreground ml-1">Ubicación</span>
+              <div className="relative w-full">
                 <Input
                   type="text"
-                  placeholder="Buscar por zona, calle o referencia..."
+                  placeholder="Ciudad, zona o barrio..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="h-12 pl-12 pr-4 text-lg"
+                  className="pl-9 h-10 bg-muted/50"
                 />
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
-              {searchTerm && (
-                <div className="mt-2 text-sm text-muted-foreground text-center">
-                  {useFullTextSearch ? (
-                    <span>🔍 Búsqueda full-text activa para "{searchTerm}"</span>
-                  ) : (
-                    <span className="text-yellow-600">⚠️ Presiona Enter para búsqueda avanzada</span>
-                  )}
-                </div>
-              )}
             </div>
-          </div>
-        </section>
 
-        {/* Filters */}
-        <section className="border-b border-border bg-card">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-                className="lg:hidden"
-              >
-                <SlidersHorizontal className="h-4 w-4 mr-2" />
-                Filtros
-              </Button>
-
-              <div className={`flex-1 grid gap-3 ${showFilters ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-6" : "hidden lg:grid-cols-6"}`}>
-                {/* Operation Type */}
-                <Select value={filters.operation} onValueChange={(value) => handleFilterChange('operation', value)}>
-                  <SelectTrigger className="w-full">
+            {/* Main Filters */}
+            <div className="flex flex-wrap items-end gap-2 w-full md:w-auto mt-2 md:mt-0">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground ml-1">Operación</span>
+                <Select value={filters.operation} onValueChange={(v) => handleFilterChange('operation', v)}>
+                  <SelectTrigger className="w-[120px] h-10">
                     <SelectValue placeholder="Operación" />
                   </SelectTrigger>
                   <SelectContent>
-                    {operationTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
+                    {operationTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
 
-                {/* Property Type */}
-                <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
-                  <SelectTrigger className="w-full">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground ml-1">Tipo de Propiedad</span>
+                <Select value={filters.type} onValueChange={(v) => handleFilterChange('type', v)}>
+                  <SelectTrigger className="w-[130px] h-10">
                     <SelectValue placeholder="Tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {propertyTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
+                    {propertyTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
 
-                {/* Bedrooms */}
-                <Select value={filters.bedrooms} onValueChange={(value) => handleFilterChange('bedrooms', value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Dormitorios" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bedroomsOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Currency */}
-                <Select value={filters.moneda} onValueChange={(value) => handleFilterChange('moneda', value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Moneda" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currencies.map((currency) => (
-                      <SelectItem key={currency.value} value={currency.value}>
-                        {currency.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Price Range */}
-                <div className="flex gap-2">
+              <div className="hidden sm:flex gap-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground ml-1">Moneda</span>
+                  <Select value={filters.moneda} onValueChange={(v) => handleFilterChange('moneda', v)}>
+                    <SelectTrigger className="w-[100px] h-10">
+                      <SelectValue placeholder="Moneda" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencies.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground ml-1">Precio máx</span>
                   <Input
-                    placeholder="Mín $"
-                    type="number"
-                    value={filters.priceMin}
-                    onChange={(e) => handleFilterChange('priceMin', e.target.value)}
-                  />
-                  <Input
-                    placeholder="Máx $"
+                    placeholder="Precio máx"
                     type="number"
                     value={filters.priceMax}
                     onChange={(e) => handleFilterChange('priceMax', e.target.value)}
+                    className="w-28 h-10"
                   />
                 </div>
+              </div>
 
-                {/* Clear Filters */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowFilters(!showFilters)}
+                className={`h-10 w-10 ${showFilters ? 'bg-primary text-primary-foreground' : ''}`}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </Button>
+
+              <div className="flex-1" />
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center rounded-md border border-border p-1 bg-muted/30">
                 <Button
-                  variant="outline"
-                  onClick={clearFilters}
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="h-8 px-2"
                 >
-                  Limpiar
+                  <ListIcon className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Lista</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'split' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('split')}
+                  className="h-8 px-2 hidden lg:flex"
+                >
+                  <Columns className="h-4 w-4 mr-1" />
+                  <span>Dividido</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'map' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('map')}
+                  className="h-8 px-2"
+                >
+                  <MapIcon className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Mapa</span>
                 </Button>
               </div>
             </div>
+          </div>
 
-            {/* Additional filters */}
-            <div className={`mt-3 grid gap-3 ${showFilters ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-6" : "hidden lg:grid-cols-6"}`}>
-              {/* Meters Range */}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Mts mín"
-                  type="number"
-                  value={filters.metrosMin}
-                  onChange={(e) => handleFilterChange('metrosMin', e.target.value)}
-                />
-                <Input
-                  placeholder="Mts máx"
-                  type="number"
-                  value={filters.metrosMax}
-                  onChange={(e) => handleFilterChange('metrosMax', e.target.value)}
-                />
+          {/* Expanded Filters */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Superficie</label>
+                <div className="flex gap-2">
+                  <Input placeholder="Mín m²" value={filters.metrosMin} onChange={(e) => handleFilterChange('metrosMin', e.target.value)} />
+                  <Input placeholder="Máx m²" value={filters.metrosMax} onChange={(e) => handleFilterChange('metrosMax', e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Dormitorios</label>
+                <Select value={filters.bedrooms} onValueChange={(v) => handleFilterChange('bedrooms', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Dormitorios" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bedroomsOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Precio Mínimo</label>
+                <Input placeholder="Precio mín" value={filters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} />
+              </div>
+              <div className="flex items-end gap-2">
+                <Button variant="ghost" onClick={clearFilters} className="flex-1">Limpiar todo</Button>
+                <Button variant="default" onClick={() => setShowFilters(false)} className="flex-1">Aplicar</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* List Side */}
+        {(viewMode === 'list' || viewMode === 'split') && (
+          <div className={`${viewMode === 'split' ? 'w-full lg:w-[45%] xl:w-[40%]' : 'w-full'} h-full overflow-y-auto scrollbar-hide border-r border-border`}>
+            <div className="p-4 md:p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-foreground">
+                  {loading ? 'Buscando...' : `${total.toLocaleString()} propiedades`}
+                </h2>
+                <Select value={filters.orderBy} onValueChange={(v) => handleFilterChange('orderBy', v)}>
+                  <SelectTrigger className="w-[180px] h-9 border-none shadow-none focus:ring-0">
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fecha">Más recientes</SelectItem>
+                    <SelectItem value="precio">Menor precio</SelectItem>
+                    <SelectItem value="vistas">Más populares</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Order By */}
-              <Select value={filters.orderBy} onValueChange={(value) => handleFilterChange('orderBy', value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fecha">Más recientes</SelectItem>
-                  <SelectItem value="precio">Precio</SelectItem>
-                  <SelectItem value="vistas">Más vistas</SelectItem>
-                  <SelectItem value="metros">Metros</SelectItem>
-                </SelectContent>
-              </Select>
+              {loading && properties.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                  <p>Cargando resultados...</p>
+                </div>
+              ) : (
+                <>
+                  <div className={`grid gap-6 ${viewMode === 'split' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                    {properties.map((property) => (
+                      <PropertyCard
+                        key={property.id}
+                        id={property.id.toString()}
+                        title={property.titulo}
+                        location={property.zona}
+                        price={formatPrice(property)}
+                        operationType={property.tipo_operacion as any}
+                        bedrooms={property.dormitorios}
+                        bathrooms={property.banos}
+                        area={`${property.metros_edificados}m²`}
+                        image={
+                          property.property_images && property.property_images.length > 0
+                            ? getImageUrl(property.property_images.find(img => img.principal)?.image_url || property.property_images[0].image_url) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
+                            : "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
+                        }
+                        publishedDate={new Date(property.created_at).toLocaleDateString('es-BO')}
+                        featured={property.destacado}
+                      />
+                    ))}
+                  </div>
 
-              {/* Order Direction */}
-              <Select value={filters.order} onValueChange={(value) => handleFilterChange('order', value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Dirección" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="desc">Descendente</SelectItem>
-                  <SelectItem value="asc">Ascendente</SelectItem>
-                </SelectContent>
-              </Select>
+                  {properties.length === 0 && !loading && (
+                    <div className="text-center py-20">
+                      <MapPin className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+                      <h3 className="text-lg font-semibold">Sin resultados</h3>
+                      <p className="text-muted-foreground text-sm">Prueba ajustando los filtros o la zona.</p>
+                      <Button variant="link" onClick={clearFilters}>Limpiar filtros</Button>
+                    </div>
+                  )}
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-12 mb-8">
+                      <Button variant="outline" size="sm" onClick={() => changePage(page - 1)} disabled={page === 1}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm font-medium">Página {page} de {totalPages}</span>
+                      <Button variant="outline" size="sm" onClick={() => changePage(page + 1)} disabled={page === totalPages}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
-        </section>
+        )}
 
-        {/* Results */}
-        <section className="py-12">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold">
-                {loading ? (
-                  "Cargando..."
-                ) : (
-                  `${total.toLocaleString()} ${total === 1 ? 'propiedad' : 'propiedades'} encontradas`
-                )}
-              </h2>
-            </div>
-
-            {loading ? (
-              <div className="flex justify-center items-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : (
-              <>
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {properties.map((property) => (
-                    <PropertyCard
-                      key={property.id}
-                      id={property.id.toString()}
-                      title={property.titulo}
-                      location={`${property.zona}, ${property.direccion}`}
-                      price={formatPrice(property)}
-                      operationType={property.tipo_operacion as any}
-                      bedrooms={property.dormitorios}
-                      bathrooms={property.banos}
-                      area={`${property.metros_edificados}m²`}
-                      image={
-                        property.property_images && property.property_images.length > 0
-                          ? getImageUrl(property.property_images.find(img => img.principal)?.image_url || property.property_images[0].image_url) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
-                          : "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
-                      }
-                      publishedDate={new Date(property.created_at).toLocaleDateString('es-BO')}
-                      featured={property.destacado}
-                    />
-                  ))}
+        {/* Map Side */}
+        {(viewMode === 'map' || viewMode === 'split') && (
+          <div className={`${viewMode === 'split' ? 'hidden lg:block lg:w-[55%] xl:w-[60%]' : 'w-full'} h-full relative z-0`}>
+            <PropertySearchMap properties={properties} center={mapCenter} />
+            
+            {/* Mobile Map Toggle Info */}
+            {viewMode === 'map' && (
+              <div className="absolute top-4 left-4 z-10 lg:hidden">
+                <div className="bg-background/90 backdrop-blur-md border border-border px-4 py-2 rounded-full shadow-lg text-sm font-bold flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  {total} resultados
                 </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 mt-8">
-                    <Button
-                      variant="outline"
-                      onClick={() => changePage(page - 1)}
-                      disabled={page === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Anterior
-                    </Button>
-
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        let pageNum
-                        if (totalPages <= 5) {
-                          pageNum = i + 1
-                        } else if (page <= 3) {
-                          pageNum = i + 1
-                        } else if (page >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i
-                        } else {
-                          pageNum = page - 2 + i
-                        }
-
-                        return (
-                          <Button
-                            key={pageNum}
-                            variant={page === pageNum ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => changePage(pageNum)}
-                          >
-                            {pageNum}
-                          </Button>
-                        )
-                      })}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => changePage(page + 1)}
-                      disabled={page === totalPages}
-                    >
-                      Siguiente
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-
-                {properties.length === 0 && (
-                  <div className="text-center py-16">
-                    <MapPin className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No se encontraron propiedades</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Intenta ajustar tus filtros de búsqueda
-                    </p>
-                    <Button onClick={clearFilters}>
-                      Limpiar filtros
-                    </Button>
-                  </div>
-                )}
-              </>
+              </div>
             )}
           </div>
-        </section>
-      </main>
+        )}
+      </div>
 
-      <Footer />
+      {/* Floating Action Button for Mobile Toggle */}
+      <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+        <Button
+          onClick={() => setViewMode(viewMode === 'map' ? 'list' : 'map')}
+          className="rounded-full shadow-2xl h-12 px-6 bg-primary text-primary-foreground font-bold flex items-center gap-2"
+        >
+          {viewMode === 'map' ? (
+            <><ListIcon className="h-5 w-5" /> Ver Lista</>
+          ) : (
+            <><MapIcon className="h-5 w-5" /> Ver Mapa</>
+          )}
+        </Button>
+      </div>
     </div>
+  )
+}
+
+export default function PropiedadesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <PropiedadesContent />
+    </Suspense>
   )
 }

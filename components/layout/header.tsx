@@ -108,9 +108,9 @@ export function Header() {
   }
 
   const navLinks = [
-    { name: "Venta", href: "/venta" },
-    { name: "Alquiler", href: "/alquiler" },
-    { name: "Anticrético", href: "/anticretico" },
+    { name: "Venta", href: "/propiedades?operation=venta" },
+    { name: "Alquiler", href: "/propiedades?operation=alquiler" },
+    { name: "Anticrético", href: "/propiedades?operation=anticretico" },
     { name: "Proyectos", href: "/proyectos" },
     { name: "Inmobiliarias", href: "/inmobiliarias" },
   ]

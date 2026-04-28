@@ -127,7 +127,8 @@ export async function listProperties(params: ListPropertiesParams = {}): Promise
   if (params.order_by) searchParams.append('order_by', params.order_by)
   if (params.order) searchParams.append('order', params.order)
 
-  const response = await fetch(`${API_URL}/api/properties?${searchParams.toString()}`, {
+  const baseUrl = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`
+  const response = await fetch(`${baseUrl}/properties?${searchParams.toString()}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -163,7 +164,8 @@ export async function searchProperties(params: SearchPropertiesParams): Promise<
   if (params.metros_min) searchParams.append('metros_min', params.metros_min.toString())
   if (params.metros_max) searchParams.append('metros_max', params.metros_max.toString())
 
-  const response = await fetch(`${API_URL}/api/properties/search?${searchParams.toString()}`, {
+  const baseUrl = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`
+  const response = await fetch(`${baseUrl}/properties/search?${searchParams.toString()}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -181,7 +183,8 @@ export async function searchProperties(params: SearchPropertiesParams): Promise<
  * Obtiene una propiedad por ID
  */
 export async function getProperty(id: number): Promise<Property> {
-  const response = await fetch(`${API_URL}/api/properties/${id}`, {
+  const baseUrl = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`
+  const response = await fetch(`${baseUrl}/properties/${id}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

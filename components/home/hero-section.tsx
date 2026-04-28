@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Search, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,12 +15,11 @@ import {
 
 const propertyTypes = [
   { value: "todas", label: "Todas las propiedades" },
-  { value: "casas", label: "Casas" },
-  { value: "departamentos", label: "Departamentos" },
-  { value: "terrenos", label: "Terrenos" },
-  { value: "oficinas", label: "Oficinas" },
-  { value: "locales", label: "Locales Comerciales" },
-  { value: "galpones", label: "Galpones" },
+  { value: "casa", label: "Casas" },
+  { value: "departamento", label: "Departamentos" },
+  { value: "terreno", label: "Terrenos" },
+  { value: "oficina", label: "Oficinas" },
+  { value: "local", label: "Locales Comerciales" },
 ]
 
 const operationTypes = [
@@ -38,14 +38,27 @@ const cities = [
 ]
 
 export function HeroSection() {
+  const router = useRouter()
   const [propertyType, setPropertyType] = useState("todas")
   const [operationType, setOperationType] = useState("venta")
   const [city, setCity] = useState("santa-cruz")
   const [searchTerm, setSearchTerm] = useState("")
 
   const handleSearch = () => {
-    console.log({ propertyType, operationType, city, searchTerm })
-    // TODO: Implementar lógica de búsqueda
+    const params = new URLSearchParams()
+    if (operationType !== "todas") params.append("operation", operationType)
+    if (propertyType !== "todas") params.append("type", propertyType)
+    if (searchTerm) params.append("search", searchTerm)
+    
+    // Pasar la ciudad seleccionada como zona
+    if (city && city !== "todas") {
+      const selectedCity = cities.find(c => c.value === city)
+      if (selectedCity) {
+        params.append("zona", selectedCity.label)
+      }
+    }
+
+    router.push(`/propiedades?${params.toString()}`)
   }
 
   return (
