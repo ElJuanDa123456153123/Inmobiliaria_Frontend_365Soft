@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 
 // Fix para iconos por defecto de Leaflet con color rojo personalizado
-delete (L.Icon.Default.prototype as any)._getIconUrl
+if (typeof window !== 'undefined') {
+  delete (L.Icon.Default.prototype as any)._getIconUrl
+}
 
 // Crear icono rojo personalizado
 const redIcon = L.icon({

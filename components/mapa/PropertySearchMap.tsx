@@ -3,14 +3,15 @@
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import { Property } from '@/lib/properties-api'
 import { getImageUrl } from '@/lib/utils'
 import { Building, MapPin } from 'lucide-react'
 import Image from 'next/image'
 
 // Fix for default Leaflet icons
-delete (L.Icon.Default.prototype as any)._getIconUrl
+if (typeof window !== 'undefined') {
+  delete (L.Icon.Default.prototype as any)._getIconUrl
+}
 
 const customIcon = L.icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',

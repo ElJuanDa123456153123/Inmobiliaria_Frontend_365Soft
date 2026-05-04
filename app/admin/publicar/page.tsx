@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useLayoutEffect } from "react"
 import { FormularioProvider } from "@/lib/contexts/FormularioContext"
-import { FormularioContent } from "@/app/publicar/formulario/page"
+import { FormularioContent } from "@/components/propiedades/FormularioContent"
 
 function AdminPublicarContent() {
   const [isReady, setIsReady] = useState(false)
