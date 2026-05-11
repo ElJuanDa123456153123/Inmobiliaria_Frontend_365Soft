@@ -51,6 +51,12 @@ export default function PropertyDetailPage() {
 
       try {
         const propertyData = await apiService.getProperty(parseInt(id as string))
+        console.log("📝 Propiedad cargada:", {
+          id: propertyData.id,
+          titulo: propertyData.titulo,
+          asesores_asignados: propertyData.asesores_asignados,
+          num_asesores: propertyData.asesores_asignados?.length || 0
+        })
         setProperty(propertyData)
       } catch (error) {
         console.error('Error cargando propiedad:', error)
@@ -267,9 +273,10 @@ export default function PropertyDetailPage() {
                 {/* Description */}
                 <div>
                   <h2 className="text-xl font-semibold mb-4">Descripción</h2>
-                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {property.descripcion}
-                  </p>
+                  <div
+                    className="text-muted-foreground leading-relaxed [&_p]:mb-4 [&_p]:last:mb-0"
+                    dangerouslySetInnerHTML={{ __html: property.descripcion }}
+                  />
                 </div>
 
                 {/* Confort y Seguridad */}
@@ -377,70 +384,10 @@ export default function PropertyDetailPage() {
               {/* Sidebar - Contact Card */}
               <div className="lg:col-span-1">
                 <div className="sticky top-4 space-y-6">
-                  {/* Agent Card */}
-                  <div className="bg-card rounded-xl p-6 shadow-lg border border-border">
-                    <h3 className="font-semibold text-lg mb-4">Contactar Vendedor</h3>
-
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white text-2xl font-bold">
-                        {property.vendedor_nombre.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="font-semibold">{property.vendedor_nombre}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {property.vendedor_contacto || "Propietario"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {property.vendedor_telefono && (
-                        <Button className="w-full" size="lg" asChild>
-                          <a href={`tel:${property.vendedor_telefono}`}>
-                            <Phone className="h-4 w-4 mr-2" />
-                            Llamar ahora
-                          </a>
-                        </Button>
-                      )}
-                      {property.vendedor_email && (
-                        <Button className="w-full" variant="outline" size="lg" asChild>
-                          <a href={`mailto:${property.vendedor_email}`}>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Enviar mensaje
-                          </a>
-                        </Button>
-                      )}
-                      <Button className="w-full" variant="outline" size="lg">
-                        <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                        </svg>
-                        WhatsApp
-                      </Button>
-                    </div>
-
-                    <div className="pt-4 border-t border-border space-y-2 text-sm">
-                      {property.vendedor_telefono && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-4 w-4" />
-                          <span>{property.vendedor_telefono}</span>
-                        </div>
-                      )}
-                      {property.vendedor_horario && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                          <span>{property.vendedor_horario}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Asesores Asignados */}
-                  {property.asesores_asignados && property.asesores_asignados.length > 0 && (
+                  {/* Asesores Asignados - Prioridad sobre vendedor */}
+                  {property.asesores_asignados && property.asesores_asignados.length > 0 ? (
                     <div className="bg-card rounded-xl p-6 shadow-lg border border-border">
-                      <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                        <UserCog className="h-5 w-5 text-primary" />
-                        Asesores Asignados
-                      </h3>
+                      <h3 className="font-semibold text-lg mb-4">Contactar Asesor</h3>
 
                       <div className="space-y-4">
                         {property.asesores_asignados.map((asignacion) => {
@@ -448,53 +395,146 @@ export default function PropertyDetailPage() {
                           if (!asesor) return null
 
                           return (
-                            <div
-                              key={asignacion.id}
-                              className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
-                            >
-                              {/* Foto del asesor */}
-                              {asesor.imagen_url ? (
-                                <img
-                                  src={getImageUrl(asesor.imagen_url) || asesor.imagen_url}
-                                  alt={asesor.nombre}
-                                  className="w-12 h-12 rounded-full object-cover border-2 border-border flex-shrink-0"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                  <User className="h-6 w-6 text-primary" />
-                                </div>
-                              )}
+                            <div key={asignacion.id} className="space-y-4">
+                              {/* Info del asesor */}
+                              <div
+                                className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg border border-border"
+                              >
+                                {/* Foto del asesor */}
+                                {asesor.avatar_url || asesor.imagen_url ? (
+                                  <img
+                                    src={getImageUrl(asesor.avatar_url || asesor.imagen_url) || asesor.avatar_url || asesor.imagen_url}
+                                    alt={asesor.nombre}
+                                    className="w-14 h-14 rounded-full object-cover border-2 border-primary flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 text-white text-xl font-bold">
+                                    {asesor.nombre.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
 
-                              {/* Información del asesor */}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm">{asesor.nombre}</p>
-                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
-                                  {asesor.especialidad && (
-                                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">
-                                      {asesor.especialidad}
-                                    </span>
-                                  )}
+                                {/* Información del asesor */}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-base">{asesor.nombre}</p>
+                                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
+                                    {asesor.especialidad && (
+                                      <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                                        {asesor.especialidad}
+                                      </span>
+                                    )}
+                                  </div>
                                   {asesor.telefono && (
-                                    <span className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                                       <Phone className="h-3 w-3" />
-                                      {asesor.telefono}
-                                    </span>
+                                      <span>{asesor.telefono}</span>
+                                    </div>
                                   )}
                                 </div>
                               </div>
 
-                              {/* Botón de contacto */}
-                              {asesor.telefono && (
-                                <Button size="sm" variant="outline" asChild>
-                                  <a href={`tel:${asesor.telefono}`}>
-                                    <Phone className="h-3 w-3 mr-1" />
-                                    Llamar
-                                  </a>
+                              {/* Botones de contacto */}
+                              <div className="space-y-3">
+                                {asesor.telefono && (
+                                  <Button className="w-full" size="lg" asChild>
+                                    <a href={`tel:${asesor.telefono}`}>
+                                      <Phone className="h-4 w-4 mr-2" />
+                                      Llamar ahora
+                                    </a>
+                                  </Button>
+                                )}
+                                {asesor.email && (
+                                  <Button className="w-full" variant="outline" size="lg" asChild>
+                                    <a href={`mailto:${asesor.email}`}>
+                                      <Mail className="h-4 w-4 mr-2" />
+                                      Enviar mensaje
+                                    </a>
+                                  </Button>
+                                )}
+                                <Button className="w-full" variant="outline" size="lg">
+                                  <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                                  </svg>
+                                  WhatsApp
                                 </Button>
+                              </div>
+
+                              {/* Info adicional */}
+                              {(asesor.telefono || asesor.email) && (
+                                <div className="pt-4 border-t border-border space-y-2 text-sm">
+                                  {asesor.telefono && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <Phone className="h-4 w-4" />
+                                      <span>{asesor.telefono}</span>
+                                    </div>
+                                  )}
+                                  {asesor.email && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <Mail className="h-4 w-4" />
+                                      <span>{asesor.email}</span>
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
                           )
                         })}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Agent Card - Solo si no hay asesores asignados */
+                    <div className="bg-card rounded-xl p-6 shadow-lg border border-border">
+                      <h3 className="font-semibold text-lg mb-4">Contactar Vendedor</h3>
+
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white text-2xl font-bold">
+                          {property.vendedor_nombre.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-semibold">{property.vendedor_nombre}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {property.vendedor_contacto || "Propietario"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {property.vendedor_telefono && (
+                          <Button className="w-full" size="lg" asChild>
+                            <a href={`tel:${property.vendedor_telefono}`}>
+                              <Phone className="h-4 w-4 mr-2" />
+                              Llamar ahora
+                            </a>
+                          </Button>
+                        )}
+                        {property.vendedor_email && (
+                          <Button className="w-full" variant="outline" size="lg" asChild>
+                            <a href={`mailto:${property.vendedor_email}`}>
+                              <Mail className="h-4 w-4 mr-2" />
+                              Enviar mensaje
+                            </a>
+                          </Button>
+                        )}
+                        <Button className="w-full" variant="outline" size="lg">
+                          <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                          </svg>
+                          WhatsApp
+                        </Button>
+                      </div>
+
+                      <div className="pt-4 border-t border-border space-y-2 text-sm">
+                        {property.vendedor_telefono && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Phone className="h-4 w-4" />
+                            <span>{property.vendedor_telefono}</span>
+                          </div>
+                        )}
+                        {property.vendedor_horario && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            <span>{property.vendedor_horario}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

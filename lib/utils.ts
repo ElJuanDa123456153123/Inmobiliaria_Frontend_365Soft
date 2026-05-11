@@ -34,21 +34,12 @@ export function getImageUrl(imageUrl: string | null | undefined): string | null 
     return imageUrl
   }
 
-  // 4. Si es una ruta relativa del backend (/api/imagenes/...), convertirla a URL completa
+  // 4. Si es una ruta relativa del backend (/api/imagenes/...)
   if (imageUrl.startsWith('/')) {
-    // Obtener la URL base del backend
-    let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
-
-    // Normalizar: remover /api del final si existe
-    apiUrl = apiUrl.replace(/\/api$/, '')
-
-    // Remover slash del final si existe
-    apiUrl = apiUrl.replace(/\/$/, '')
-
-    // Construir URL completa del backend
-    const fullUrl = `${apiUrl}${imageUrl}`
-
-    return fullUrl
+    // En SSR o en el cliente, devolver la ruta relativa
+    // El navegador la resolverá como http://localhost:3000/api/imagenes/...
+    // y el route handler en /api/imagenes/[...path] hará el proxy al backend
+    return imageUrl
   }
 
   // 5. Detectar base64 sin prefijo (solo caracteres alfanuméricos, +, /)

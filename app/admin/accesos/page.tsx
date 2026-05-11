@@ -16,6 +16,7 @@ interface User {
   created_at: string
   nombre_inmobiliaria?: string
   nit?: string
+  avatar_url?: string
 }
 
 export default function AccessManagementPage() {
@@ -39,7 +40,7 @@ export default function AccessManagementPage() {
     email: "",
     password: "",
     telefono: "",
-    rol: "usuario",
+    rol: "agente",
     nombre_inmobiliaria: "",
     nit: "",
     activo: true
@@ -97,7 +98,7 @@ export default function AccessManagementPage() {
       email: "",
       password: "",
       telefono: "",
-      rol: "usuario",
+      rol: "agente",
       nombre_inmobiliaria: "",
       nit: "",
       activo: true
@@ -206,11 +207,14 @@ export default function AccessManagementPage() {
     }
   }
 
-  const filteredUsers = users.filter(user =>
-    user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.rol.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredUsers = users.filter(user => {
+    // Solo mostrar admin y agentes (agente)
+    const isAllowedRole = user.rol === "admin" || user.rol === "agente"
+    const matchesSearch = user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.rol.toLowerCase().includes(searchTerm.toLowerCase())
+    return isAllowedRole && matchesSearch
+  })
 
   // Pagination logic
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
@@ -249,7 +253,7 @@ export default function AccessManagementPage() {
             Gestión de Accesos
           </h1>
           <p className="text-muted-foreground mt-2 text-sm max-w-xl">
-            Crea cuentas de acceso, asigna contraseñas, administra roles y controla el acceso a la plataforma.
+            Administra los accesos de administradores y asesores (agentes) al panel de control.
           </p>
         </div>
         <Button onClick={openCreateModal} size="lg" className="shadow-md">
@@ -306,10 +310,24 @@ export default function AccessManagementPage() {
                   <tr key={user.id} className="hover:bg-primary/5 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
-                          <span className="text-primary font-bold text-sm">
-                            {user.nombre.charAt(0).toUpperCase()}
-                          </span>
+                        <div className="flex-shrink-0 h-10 w-10 rounded-full overflow-hidden border border-primary/20">
+                          {user.avatar_url ? (
+                            <img
+                              src={user.avatar_url}
+                              alt={user.nombre}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-primary font-bold text-sm">
+                                {user.nombre.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-semibold text-foreground">{user.nombre}</div>
@@ -468,9 +486,7 @@ export default function AccessManagementPage() {
                       value={formData.rol}
                       onChange={e => setFormData({...formData, rol: e.target.value})}
                     >
-                      <option value="usuario">Usuario Regular</option>
-                      <option value="agente">Agente Inmobiliario</option>
-                      <option value="inmobiliaria">Inmobiliaria (Empresa)</option>
+                      <option value="agente">Agente Inmobiliario (Asesor)</option>
                       <option value="admin">Administrador Total</option>
                     </select>
                   </div>

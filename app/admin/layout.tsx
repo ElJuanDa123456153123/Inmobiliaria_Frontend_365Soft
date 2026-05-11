@@ -14,6 +14,7 @@ export default function AdminLayout({
   const pathname = usePathname()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [userName, setUserName] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>("Admin")
   const [isClient, setIsClient] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -32,18 +33,27 @@ export default function AdminLayout({
     const token = localStorage.getItem("token")
     const name = localStorage.getItem("userName")
     const isAdmin = localStorage.getItem("isAdmin")
+    const isAdvisor = localStorage.getItem("isAdvisor")
 
     // Permitir acceso a /admin/publicar sin verificar admin (la página misma establece el flag)
     const isAdminPublicRoute = pathname === '/admin/publicar'
 
-    if (!token || (!isAdminPublicRoute && isAdmin !== "true")) {
-      // Si no está logueado o no es admin (y no es ruta pública), redirigir a login
+    // Permitir acceso a admin o agentes (asesores)
+    if (!token || (!isAdminPublicRoute && isAdmin !== "true" && isAdvisor !== "true")) {
+      // Si no está logueado o no es admin/asesor (y no es ruta pública), redirigir a login
       router.push("/login")
       return
     }
 
     if (name) {
       setUserName(name)
+    }
+
+    // Establecer el rol para mostrar en el panel
+    if (isAdmin === "true") {
+      setUserRole("Administrador")
+    } else if (isAdvisor === "true") {
+      setUserRole("Asesor")
     }
 
     setIsLoading(false)
@@ -54,9 +64,11 @@ export default function AdminLayout({
     const updateAuthState = () => {
       const token = localStorage.getItem("token")
       const isAdmin = localStorage.getItem("isAdmin")
+      const isAdvisor = localStorage.getItem("isAdvisor")
       const isAdminPublicRoute = pathname === '/admin/publicar'
 
-      if (!token || (!isAdminPublicRoute && isAdmin !== "true")) {
+      // Permitir acceso a admin o agentes (asesores)
+      if (!token || (!isAdminPublicRoute && isAdmin !== "true" && isAdvisor !== "true")) {
         router.push("/login")
       }
     }
@@ -74,6 +86,7 @@ export default function AdminLayout({
     localStorage.removeItem("token")
     localStorage.removeItem("userName")
     localStorage.removeItem("isAdmin")
+    localStorage.removeItem("isAdvisor")
     setUserName(null)
     setUserMenuOpen(false)
     window.dispatchEvent(new Event("auth-change"))
@@ -179,7 +192,7 @@ export default function AdminLayout({
             </div>
             <div className="flex-1">
               <p className="font-medium text-sm">{userName || "Admin"}</p>
-              <p className="text-xs text-gray-400">Administrador</p>
+              <p className="text-xs text-gray-400">{userRole}</p>
             </div>
           </button>
 

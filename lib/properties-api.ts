@@ -3,7 +3,15 @@
  * Conecta el frontend con el backend de Go
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+// Obtener la URL del API según el contexto (igual que en api.ts)
+const getApiUrl = () => {
+  // Si estamos en el servidor, usar API_URL_INTERNAL
+  if (typeof window === 'undefined') {
+    return process.env.API_URL_INTERNAL || 'http://backend:3001'
+  }
+  // Si estamos en el cliente, usar NEXT_PUBLIC_API_URL
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+}
 
 export interface Property {
   id: number
@@ -34,7 +42,7 @@ export interface Property {
   vendedor_nombre: string
   vendedor_email: string
   vendedor_telefono: string
-  property_images?: PropertyImage[]
+  imagenes?: PropertyImage[]
 }
 
 export interface PropertyImage {
@@ -127,7 +135,7 @@ export async function listProperties(params: ListPropertiesParams = {}): Promise
   if (params.order_by) searchParams.append('order_by', params.order_by)
   if (params.order) searchParams.append('order', params.order)
 
-  const baseUrl = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`
+  const baseUrl = getApiUrl().endsWith('/api') ? getApiUrl() : `${getApiUrl()}/api`
   const response = await fetch(`${baseUrl}/properties?${searchParams.toString()}`, {
     method: 'GET',
     headers: {
@@ -164,7 +172,7 @@ export async function searchProperties(params: SearchPropertiesParams): Promise<
   if (params.metros_min) searchParams.append('metros_min', params.metros_min.toString())
   if (params.metros_max) searchParams.append('metros_max', params.metros_max.toString())
 
-  const baseUrl = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`
+  const baseUrl = getApiUrl().endsWith('/api') ? getApiUrl() : `${getApiUrl()}/api`
   const response = await fetch(`${baseUrl}/properties/search?${searchParams.toString()}`, {
     method: 'GET',
     headers: {
@@ -183,7 +191,7 @@ export async function searchProperties(params: SearchPropertiesParams): Promise<
  * Obtiene una propiedad por ID
  */
 export async function getProperty(id: number): Promise<Property> {
-  const baseUrl = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`
+  const baseUrl = getApiUrl().endsWith('/api') ? getApiUrl() : `${getApiUrl()}/api`
   const response = await fetch(`${baseUrl}/properties/${id}`, {
     method: 'GET',
     headers: {

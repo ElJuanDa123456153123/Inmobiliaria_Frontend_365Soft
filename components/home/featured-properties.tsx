@@ -61,20 +61,30 @@ export function FeaturedProperties() {
 
   // Convertir propiedad del backend al formato que espera PropertyCard
   const formatProperty = (property: Property) => {
+    // Obtener todas las imágenes usando getImageUrl para normalización correcta
+    const allImages = property.imagenes && property.imagenes.length > 0
+      ? property.imagenes
+          .map(img => getImageUrl(img.image_url))
+          .filter((url): url is string => url !== null)
+      : []
+
     // Obtener la imagen principal (primera imagen o la marcada como principal)
     const mainImage = property.imagenes && property.imagenes.length > 0
-      ? property.imagenes.find(img => img.principal) || property.imagenes[0]
+      ? (property.imagenes.find(img => img.principal) || property.imagenes[0])
       : null
 
-    // Usar getImageUrl() para convertir la URL del backend a una URL completa válida
-    const imageUrl = mainImage?.image_url
+    const imageUrl = mainImage
+      ? (getImageUrl(mainImage.image_url) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop")
+      : "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
 
-    // Debug: Log para ver qué está llegando
-    console.log('Property:', property.titulo, 'Image URL:', imageUrl, 'Main image:', mainImage)
-
-    const image = getImageUrl(imageUrl) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
-
-    console.log('Final image URL:', image)
+    // Determinar si mostrar vendedor real o 365Soft
+    const mostrarVendedor = property.mostrar_vendedor !== false; // Por defecto true
+    const nombreVendedor = mostrarVendedor
+      ? (property.vendedor_contacto || property.vendedor_nombre)
+      : '365Soft';
+    const nombreAgencia = mostrarVendedor
+      ? property.vendedor_nombre
+      : '365Soft';
 
     return {
       id: property.id.toString(),
@@ -85,9 +95,13 @@ export function FeaturedProperties() {
       bedrooms: parseInt(property.dormitorios) || 0,
       bathrooms: parseInt(property.banos) || 0,
       area: `${property.metros_edificados}m²`,
-      image: image,
+      image: imageUrl,
       publishedDate: property.fecha_publicacion ? getTimeAgo(property.fecha_publicacion) : 'Reciente',
       featured: property.destacado,
+      description: property.descripcion,
+      agentName: nombreVendedor,
+      agencyName: nombreAgencia,
+      images: allImages,
     }
   }
 

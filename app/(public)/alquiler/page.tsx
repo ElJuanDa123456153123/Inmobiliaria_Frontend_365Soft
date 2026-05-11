@@ -1,47 +1,58 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { PropertyCard } from "@/components/home/property-card"
-
-const alquilerProperties = [
-  {
-    id: "2",
-    title: "Departamento Moderno",
-    location: "La Paz, Achumani",
-    price: "$1,200/mes",
-    operationType: "alquiler" as const,
-    bedrooms: 2,
-    bathrooms: 2,
-    area: "120m²",
-    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=600&fit=crop",
-    publishedDate: "1 semana",
-  },
-  {
-    id: "5",
-    title: "Loft Industrial",
-    location: "La Paz, Sopocachi",
-    price: "$850/mes",
-    operationType: "alquiler" as const,
-    bedrooms: 1,
-    bathrooms: 1,
-    area: "85m²",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop",
-    publishedDate: "1 día",
-  },
-  {
-    id: "7",
-    title: "Departamento en el Centro",
-    location: "Santa Cruz, Centro",
-    price: "$650/mes",
-    operationType: "alquiler" as const,
-    bedrooms: 2,
-    bathrooms: 1,
-    area: "90m²",
-    image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop",
-    publishedDate: "6 días",
-  },
-]
+import { apiService } from "@/lib/services/api"
+import type { Property } from "@/lib/services/api"
+import { getImageUrl } from "@/lib/utils"
 
 export default function AlquilerPage() {
+  const [properties, setProperties] = useState<Property[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchProperties = async () => {
+      try {
+        setLoading(true)
+        const response = await apiService.listProperties({
+          tipo_operacion: "alquiler"
+        })
+        setProperties(response.propiedades)
+      } catch (err: any) {
+        console.error("Error fetching properties:", err)
+        setError(err.message || "Error al cargar las propiedades")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProperties()
+  }, [])
+
+  // Transformar datos del backend al formato que espera PropertyCard
+  const mapPropertyToCard = (property: Property) => ({
+    id: property.id.toString(),
+    title: property.titulo,
+    location: `${property.zona}${property.direccion ? `, ${property.direccion}` : ''}`,
+    price: property.moneda === 'USD' ? `$${property.precio.toLocaleString()}/mes` : `Bs ${property.precio.toLocaleString()}/mes`,
+    operationType: property.tipo_operacion as "venta" | "alquiler" | "anticretico",
+    bedrooms: property.dormitorios,
+    bathrooms: property.banos,
+    area: `${property.metros_edificados}m²`,
+    image: property.imagenes && property.imagenes.length > 0
+      ? (getImageUrl(property.imagenes[0].image_url) || "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=600&fit=crop")
+      : "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=600&fit=crop",
+    publishedDate: property.fecha_publicacion ? new Date(property.fecha_publicacion).toLocaleDateString() : undefined,
+    featured: property.destacado,
+    description: property.descripcion,
+    agentName: property.vendedor_contacto || property.vendedor_nombre,
+    agencyName: property.vendedor_nombre,
+    images: property.imagenes?.map(img => getImageUrl(img.image_url) || "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=600&fit=crop") || [],
+  })
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -65,14 +76,36 @@ export default function AlquilerPage() {
         <section className="py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2 className="text-2xl font-bold mb-8">
-              {alquilerProperties.length} propiedades en alquiler
+              {loading ? "Cargando..." : `${properties.length} propiedades en alquiler`}
             </h2>
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {alquilerProperties.map((property) => (
-                <PropertyCard key={property.id} {...property} />
-              ))}
-            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+                {error}
+              </div>
+            )}
+
+            {loading ? (
+              <div className="text-center py-16">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                <p className="mt-4 text-muted-foreground">Cargando propiedades...</p>
+              </div>
+            ) : properties.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-muted-foreground">
+                  No hay propiedades en alquiler en este momento
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {properties.map((property) => (
+                  <PropertyCard
+                    key={property.id}
+                    {...mapPropertyToCard(property)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </main>

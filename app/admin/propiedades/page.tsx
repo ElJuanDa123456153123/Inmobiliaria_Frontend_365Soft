@@ -69,6 +69,13 @@ export default function AdminPropertiesPage() {
         search: searchTerm || undefined,
       }
       const data = await adminApi.listProperties(cleanFilters)
+      console.log("📝 Propiedades cargadas:", data.properties.map((p: any) => ({
+        id: p.id,
+        titulo: p.titulo,
+        asesores_asignados: p.asesores_asignados,
+        num_asesores: p.asesores_asignados?.length || 0,
+        advisor: p.advisor?.nombre || 'none'
+      })))
       setProperties(data.properties || [])
     } catch (error: any) {
       toast.error(error.message || "Error al cargar propiedades")
@@ -120,6 +127,33 @@ export default function AdminPropertiesPage() {
     }
   }
 
+  const toggleMostrarVendedor = async (id: number, mostrar: boolean) => {
+    try {
+      await adminApi.updateProperty(id, { mostrar_vendedor: mostrar })
+      toast.success(mostrar ? "Vendedor visible" : "Vendedor oculto (365Soft)")
+
+      // Actualizar el estado local inmediatamente
+      if (selectedProperty && selectedProperty.id === id) {
+        setSelectedProperty({
+          ...selectedProperty,
+          mostrar_vendedor: mostrar
+        })
+      }
+
+      // Actualizar también el array de propiedades localmente para cambios inmediatos
+      setProperties(prevProperties =>
+        prevProperties.map(p =>
+          p.id === id ? { ...p, mostrar_vendedor: mostrar } : p
+        )
+      )
+
+      // Recargar del backend para asegurar sincronización
+      fetchProperties()
+    } catch (error: any) {
+      toast.error(error.message || "Error al actualizar visibilidad")
+    }
+  }
+
   const handleDelete = async (id: number) => {
     if (!confirm("¿Estás seguro de eliminar esta propiedad?")) return
 
@@ -143,15 +177,23 @@ export default function AdminPropertiesPage() {
 
   const handleOpenAdvisorModal = async (propertyId: number) => {
     setSelectedPropertyId(propertyId)
-    const property = properties.find(p => p.id === propertyId)
-    setSelectedProperty(property || null)
 
     try {
       setLoadingAdvisors(true)
       setLoadingAssignedAdvisors(true)
 
+      // Cargar la propiedad actualizada desde el backend (no usar el array local)
+      const propertyData = await adminApi.getProperty(propertyId)
+      setSelectedProperty(propertyData)
+
       // Cargar todos los asesores disponibles
       const advisorsData = await adminApi.listAdvisors({ activo: true })
+      console.log("📝 Asesores cargados:", advisorsData.advisors.map((a: any) => ({
+        id: a.id,
+        nombre: a.nombre,
+        avatar_url: a.avatar_url,
+        imagen_url: a.imagen_url
+      })))
       setAdvisors(advisorsData.advisors)
 
       // Cargar asesores ya asignados a esta propiedad
@@ -450,8 +492,17 @@ export default function AdminPropertiesPage() {
                       <div className="text-xs text-muted-foreground">{property.user?.email}</div>
                     </td>
                     <td className="px-6 py-4">
-                      {property.advisor ? (
-                        <div className="text-sm text-foreground">{property.advisor.nombre}</div>
+                      {property.asesores_asignados && property.asesores_asignados.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {property.asesores_asignados.map((pa: any) => (
+                            <span
+                              key={pa.id}
+                              className="inline-flex items-center px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded-md"
+                            >
+                              {pa.asesor?.nombre || 'Sin nombre'}
+                            </span>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">Sin asignar</span>
                       )}
@@ -598,14 +649,43 @@ export default function AdminPropertiesPage() {
                     <User className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-1">Publicado por</h3>
-                    <p className="font-medium truncate">{selectedProperty.vendedor_nombre}</p>
-                    {selectedProperty.user && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <Mail className="h-3 w-3" />
-                        <span className="truncate">{selectedProperty.user.email}</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-semibold text-sm text-muted-foreground">Publicado por</h3>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${
+                          selectedProperty.mostrar_vendedor ? 'text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full' : 'text-muted-foreground bg-muted px-2 py-1 rounded-full'
+                        }`}>
+                          {selectedProperty.mostrar_vendedor ? '✓ Visible' : '✕ No visible'}
+                        </span>
+                        <button
+                          onClick={() => toggleMostrarVendedor(selectedProperty.id, !selectedProperty.mostrar_vendedor)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            selectedProperty.mostrar_vendedor ? 'bg-primary' : 'bg-muted'
+                          }`}
+                          title={selectedProperty.mostrar_vendedor ? 'Click para ocultar vendedor (mostrar 365Soft)' : 'Click para mostrar vendedor real'}
+                        >
+                          <span
+                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                              selectedProperty.mostrar_vendedor ? 'translate-x-6' : 'translate-x-0.5'
+                            }`}
+                          />
+                        </button>
                       </div>
-                    )}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-medium truncate">
+                        {selectedProperty.mostrar_vendedor ? selectedProperty.vendedor_nombre : '365Soft'}
+                      </p>
+                      {!selectedProperty.mostrar_vendedor && (
+                        <p className="text-xs text-muted-foreground">Mostrando 365Soft en lugar del vendedor real</p>
+                      )}
+                      {selectedProperty.mostrar_vendedor && selectedProperty.user && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mail className="h-3 w-3" />
+                          <span className="truncate">{selectedProperty.user.email}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -637,13 +717,19 @@ export default function AdminPropertiesPage() {
                       className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg group"
                     >
                       {/* Foto del asesor */}
-                      {advisor.imagen_url ? (
+                      {advisor.avatar_url ? (
                         <img
-                          src={getImageUrl(advisor.imagen_url) || advisor.imagen_url}
+                          src={advisor.avatar_url}
                           alt={advisor.nombre}
                           className="w-12 h-12 rounded-full object-cover border-2 border-border"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.nextElementSibling?.classList.remove('hidden');
+                          }}
                         />
-                      ) : (
+                      ) : null}
+                      {advisor.avatar_url ? null : (
                         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                           <User className="h-6 w-6 text-primary" />
                         </div>
@@ -653,14 +739,8 @@ export default function AdminPropertiesPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{advisor.nombre}</p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          {advisor.especialidad && (
-                            <span className="truncate">{advisor.especialidad}</span>
-                          )}
                           {advisor.telefono && (
-                            <>
-                              <span>•</span>
-                              <span className="truncate">{advisor.telefono}</span>
-                            </>
+                            <span className="truncate">{advisor.telefono}</span>
                           )}
                         </div>
                       </div>
@@ -702,12 +782,16 @@ export default function AdminPropertiesPage() {
                       .map((advisor) => (
                         <SelectItem key={advisor.id} value={advisor.id.toString()}>
                           <div className="flex items-center gap-2">
-                            {advisor.imagen_url && (
+                            {advisor.avatar_url ? (
                               <img
-                                src={getImageUrl(advisor.imagen_url) || advisor.imagen_url}
+                                src={advisor.avatar_url}
                                 alt={advisor.nombre}
                                 className="w-5 h-5 rounded-full object-cover"
                               />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                                <User className="h-3 w-3 text-primary" />
+                              </div>
                             )}
                             <span>{advisor.nombre}</span>
                             {advisor.especialidad && (

@@ -7,11 +7,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { adminApi, Advisor } from "@/lib/services/admin-api"
 import { toast } from "sonner"
+import { api } from "@/lib/services/api"
+
+interface User {
+  id: number
+  nombre: string
+  email: string
+  telefono: string
+  rol: string
+  activo: boolean
+  verificado: boolean
+  created_at: string
+  apellido?: string
+  nombre_inmobiliaria?: string
+  nit?: string
+  avatar_url?: string
+}
 
 export default function AdminAdvisorsPage() {
-  const [advisors, setAdvisors] = useState<Advisor[]>([])
+  const [advisors, setAdvisors] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -21,14 +36,18 @@ export default function AdminAdvisorsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
   const [imagenPreview, setImagenPreview] = useState<string | null>(null)
+  const [imagenFile, setImagenFile] = useState<File | null>(null)
   const [formData, setFormData] = useState({
+    id: 0,
     nombre: "",
     email: "",
+    password: "",
     telefono: "",
-    especialidad: "",
-    imagen_url: "",
+    rol: "agente",
+    avatar_url: "",
     activo: true,
   })
+  const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
     fetchAdvisors()
@@ -41,11 +60,22 @@ export default function AdminAdvisorsPage() {
   const fetchAdvisors = async () => {
     try {
       setLoading(true)
-      const data = await adminApi.listAdvisors({
-        page: currentPage,
-        limit: itemsPerPage,
+      const token = localStorage.getItem("token")
+      const response = await fetch("http://localhost:3001/api/admin/users", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
       })
-      setAdvisors(data.advisors)
+
+      if (response.ok) {
+        const data = await response.json()
+        // Filtrar solo usuarios con rol "agente"
+        const agentsOnly = (data.users || []).filter((user: User) => user.rol === "agente")
+        console.log("📝 Asesores cargados:", agentsOnly.map((a: User) => ({ id: a.id, nombre: a.nombre, avatar_url: a.avatar_url })))
+        setAdvisors(agentsOnly)
+      } else {
+        toast.error("Error al cargar asesores")
+      }
     } catch (error: any) {
       toast.error(error.message || "Error al cargar asesores")
     } finally {
@@ -55,9 +85,28 @@ export default function AdminAdvisorsPage() {
 
   const handleToggleActive = async (id: number) => {
     try {
-      await adminApi.toggleAdvisorActive(id)
-      toast.success("Asesor actualizado correctamente")
-      fetchAdvisors()
+      const token = localStorage.getItem("token")
+      const user = advisors.find(a => a.id === id)
+      if (!user) return
+
+      const response = await fetch(`http://localhost:3001/api/admin/users/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...user,
+          activo: !user.activo
+        })
+      })
+
+      if (response.ok) {
+        toast.success("Asesor actualizado correctamente")
+        fetchAdvisors()
+      } else {
+        toast.error("Error al actualizar asesor")
+      }
     } catch (error: any) {
       toast.error(error.message || "Error al actualizar asesor")
     }
@@ -67,9 +116,20 @@ export default function AdminAdvisorsPage() {
     if (!confirm("¿Estás seguro de eliminar este asesor?")) return
 
     try {
-      await adminApi.deleteAdvisor(id)
-      toast.success("Asesor eliminado correctamente")
-      fetchAdvisors()
+      const token = localStorage.getItem("token")
+      const response = await fetch(`http://localhost:3001/api/admin/users/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        toast.success("Asesor eliminado correctamente")
+        fetchAdvisors()
+      } else {
+        toast.error("Error al eliminar asesor")
+      }
     } catch (error: any) {
       toast.error(error.message || "Error al eliminar asesor")
     }
@@ -77,14 +137,35 @@ export default function AdminAdvisorsPage() {
 
   const handleOpenCreateModal = () => {
     setFormData({
+      id: 0,
       nombre: "",
       email: "",
+      password: "",
       telefono: "",
-      especialidad: "",
-      imagen_url: "",
+      rol: "agente",
+      avatar_url: "",
       activo: true,
     })
+    setIsEditing(false)
     setImagenPreview(null)
+    setImagenFile(null)
+    setCreateModalOpen(true)
+  }
+
+  const handleOpenEditModal = (advisor: User) => {
+    setFormData({
+      id: advisor.id,
+      nombre: advisor.nombre,
+      email: advisor.email,
+      password: "", // No mostrar contraseña al editar
+      telefono: advisor.telefono,
+      rol: advisor.rol,
+      avatar_url: advisor.avatar_url || "",
+      activo: advisor.activo,
+    })
+    setIsEditing(true)
+    setImagenPreview(advisor.avatar_url || null)
+    setImagenFile(null)
     setCreateModalOpen(true)
   }
 
@@ -104,23 +185,114 @@ export default function AdminAdvisorsPage() {
       toast.error("Email inválido")
       return
     }
+    // Solo validar contraseña al crear (no al editar)
+    if (!isEditing && !formData.password.trim()) {
+      toast.error("La contraseña es requerida")
+      return
+    }
+    if (formData.password && formData.password.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres")
+      return
+    }
 
     try {
       setCreateLoading(true)
-      await adminApi.createAdvisor({
-        nombre: formData.nombre,
-        email: formData.email,
-        telefono: formData.telefono || undefined,
-        especialidad: formData.especialidad || undefined,
-        imagen_url: formData.imagen_url || undefined,
-        activo: formData.activo,
-      })
-      toast.success("Asesor creado exitosamente")
+      const token = localStorage.getItem("token")
+
+      if (isEditing) {
+        // Editar asesor existente
+        const payload: any = {
+          nombre: formData.nombre,
+          email: formData.email,
+          telefono: formData.telefono,
+          rol: formData.rol,
+          activo: formData.activo
+        }
+
+        // Solo enviar contraseña si se proporciona
+        if (formData.password) {
+          payload.password = formData.password
+        }
+
+        // Subir nueva imagen si se seleccionó una
+        if (imagenFile) {
+          try {
+            toast.info("Subiendo nueva imagen...")
+            const uploadResult = await api.uploadAvatar(imagenFile)
+            payload.avatar_url = uploadResult.url
+            toast.success("Imagen actualizada correctamente")
+          } catch (error: any) {
+            toast.error(error.message || "Error al subir la imagen")
+            return // Detener la actualización si falla la subida de imagen
+          }
+        } else if (formData.avatar_url) {
+          // Mantener la imagen existente si no se seleccionó una nueva
+          payload.avatar_url = formData.avatar_url
+        }
+
+        const response = await fetch(`http://localhost:3001/api/admin/users/${formData.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        })
+
+        if (response.ok) {
+          toast.success("Asesor actualizado exitosamente")
+        } else {
+          const data = await response.json()
+          toast.error(data.error || "Error al actualizar asesor")
+        }
+      } else {
+        // Crear nuevo asesor (usuario con rol agente)
+        let avatarUrl = ""
+
+        // Subir imagen si se seleccionó una
+        if (imagenFile) {
+          try {
+            toast.info("Subiendo imagen...")
+            const uploadResult = await api.uploadAvatar(imagenFile)
+            avatarUrl = uploadResult.url
+            toast.success("Imagen subida correctamente")
+          } catch (error: any) {
+            toast.error(error.message || "Error al subir la imagen")
+            return // Detener la creación si falla la subida de imagen
+          }
+        }
+
+        const response = await fetch("http://localhost:3001/api/admin/users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            nombre: formData.nombre,
+            email: formData.email,
+            password: formData.password,
+            telefono: formData.telefono,
+            rol: formData.rol,
+            avatar_url: avatarUrl || "", // Enviar cadena vacía si no hay imagen
+            activo: formData.activo
+          })
+        })
+
+        if (response.ok) {
+          toast.success("Asesor creado exitosamente")
+        } else {
+          const data = await response.json()
+          toast.error(data.error || "Error al crear asesor")
+        }
+      }
+
       setCreateModalOpen(false)
       setImagenPreview(null)
+      setImagenFile(null)
       fetchAdvisors()
     } catch (error: any) {
-      toast.error(error.message || "Error al crear asesor")
+      toast.error(error.message || "Error al guardar asesor")
     } finally {
       setCreateLoading(false)
     }
@@ -136,71 +308,32 @@ export default function AdminAdvisorsPage() {
       return
     }
 
-    // Validar tamaño (max 2MB para evitar problemas)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('La imagen no puede superar los 2MB')
+    // Validar tamaño (max 5MB para evitar problemas)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no puede superar los 5MB')
       return
     }
 
     try {
-      // Comprimir imagen usando canvas
-      const img = new Image()
+      // Guardar el archivo original para subirlo al servidor
+      setImagenFile(file)
+
+      // Crear preview para mostrarlo en el modal
       const reader = new FileReader()
-
       reader.onload = (event) => {
-        img.src = event.target?.result as string
+        setImagenPreview(event.target?.result as string)
       }
-
-      img.onload = () => {
-        // Crear canvas para redimensionar
-        const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
-
-        if (!ctx) {
-          toast.error('Error al procesar la imagen')
-          return
-        }
-
-        // Limitar dimensiones a 300x300 (suficiente para avatar)
-        const maxSize = 300
-        let width = img.width
-        let height = img.height
-
-        if (width > height) {
-          if (width > maxSize) {
-            height = (height * maxSize) / width
-            width = maxSize
-          }
-        } else {
-          if (height > maxSize) {
-            width = (width * maxSize) / height
-            height = maxSize
-          }
-        }
-
-        canvas.width = width
-        canvas.height = height
-
-        // Dibujar imagen redimensionada
-        ctx.drawImage(img, 0, 0, width, height)
-
-        // Convertir a base64 con calidad reducida (0.7)
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7)
-        const base64Data = compressedBase64.split(',')[1]
-
-        setFormData({ ...formData, imagen_url: base64Data })
-        setImagenPreview(compressedBase64)
-      }
-
       reader.readAsDataURL(file)
+
+      toast.success('Imagen seleccionada. Se guardará al crear el asesor.')
     } catch (error) {
       toast.error('Error al procesar la imagen')
     }
   }
 
   const handleRemoveImagen = () => {
-    setFormData({ ...formData, imagen_url: "" })
     setImagenPreview(null)
+    setImagenFile(null)
   }
 
   const filteredAdvisors = advisors.filter(advisor =>
@@ -275,8 +408,6 @@ export default function AdminAdvisorsPage() {
                 <th className="px-6 py-4">ID</th>
                 <th className="px-6 py-4">Nombre</th>
                 <th className="px-6 py-4">Contacto</th>
-                <th className="px-6 py-4">Especialidad</th>
-                <th className="px-6 py-4">Propiedades</th>
                 <th className="px-6 py-4">Estado</th>
                 <th className="px-6 py-4 text-right">Acciones</th>
               </tr>
@@ -284,7 +415,7 @@ export default function AdminAdvisorsPage() {
             <tbody className="divide-y divide-border bg-background">
               {filteredAdvisors.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={5} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <UserCog className="h-10 w-10 mb-3 opacity-50" />
                       <p className="text-base font-medium">No se encontraron asesores</p>
@@ -299,10 +430,27 @@ export default function AdminAdvisorsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
-                          <span className="text-primary font-bold text-sm">
-                            {advisor.nombre.charAt(0).toUpperCase()}
-                          </span>
+                        <div className="flex-shrink-0 h-10 w-10 rounded-full overflow-hidden border border-primary/20">
+                          {advisor.avatar_url ? (
+                            <img
+                              src={advisor.avatar_url}
+                              alt={advisor.nombre}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Si la imagen falla al cargar, mostrar iniciales
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          {!advisor.avatar_url && (
+                            <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-primary font-bold text-sm">
+                                {advisor.nombre.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-semibold text-foreground">{advisor.nombre}</div>
@@ -312,18 +460,6 @@ export default function AdminAdvisorsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                       {advisor.telefono || 'Sin teléfono'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {advisor.especialidad ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-100 text-blue-800">
-                          {advisor.especialidad}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                      {advisor.propiedades?.length || 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${
@@ -348,6 +484,15 @@ export default function AdminAdvisorsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          onClick={() => handleOpenEditModal(advisor)}
+                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                          title="Editar"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleDelete(advisor.id)}
                           className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                           title="Eliminar"
@@ -364,16 +509,19 @@ export default function AdminAdvisorsPage() {
         </div>
       </div>
 
-      {/* Modal para crear asesor */}
+      {/* Modal para crear/editar asesor */}
       <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCog className="h-5 w-5" />
-              Nuevo Asesor
+              {isEditing ? "Editar Asesor" : "Nuevo Asesor"}
             </DialogTitle>
             <DialogDescription>
-              Completa el formulario para registrar un nuevo asesor inmobiliario en el sistema.
+              {isEditing
+                ? "Actualiza la información del asesor inmobiliario."
+                : "Completa el formulario para registrar un nuevo asesor inmobiliario en el sistema."
+              }
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateAdvisor} className="space-y-4 py-4">
@@ -443,7 +591,7 @@ export default function AdminAdvisorsPage() {
                     </Button>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Formatos: JPG, PNG, WEBP. Máximo 2MB (se redimensionará automáticamente)
+                    Formatos: JPG, PNG, WEBP. Máximo 5MB (se convertirá a WEBP automáticamente)
                   </p>
                 </div>
               </div>
@@ -463,6 +611,29 @@ export default function AdminAdvisorsPage() {
               />
             </div>
 
+            {/* Contraseña */}
+            <div className="space-y-2">
+              <Label htmlFor="password">
+                {isEditing ? "Contraseña (dejar vacío para no cambiar)" : "Contraseña *"}
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder={isEditing ? "Nueva contraseña (opcional)" : "Mínimo 6 caracteres"}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required={!isEditing}
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                {isEditing
+                  ? "Deja este campo vacío si no deseas cambiar la contraseña actual"
+                  : "La contraseña debe tener al menos 6 caracteres"
+                }
+              </p>
+            </div>
+
             {/* Teléfono */}
             <div className="space-y-2">
               <Label htmlFor="telefono">Teléfono</Label>
@@ -473,21 +644,6 @@ export default function AdminAdvisorsPage() {
                 value={formData.telefono}
                 onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
               />
-            </div>
-
-            {/* Especialidad */}
-            <div className="space-y-2">
-              <Label htmlFor="especialidad">Especialidad</Label>
-              <Input
-                id="especialidad"
-                name="especialidad"
-                placeholder="Ej: Propiedades de Lujo, Ventas, Alquileres"
-                value={formData.especialidad}
-                onChange={(e) => setFormData({ ...formData, especialidad: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">
-                Área de especialización del asesor (opcional)
-              </p>
             </div>
 
             {/* Activo */}
@@ -522,7 +678,10 @@ export default function AdminAdvisorsPage() {
                 disabled={createLoading}
                 className="flex-1"
               >
-                {createLoading ? "Creando..." : "Crear Asesor"}
+                {createLoading
+                  ? (isEditing ? "Actualizando..." : "Creando...")
+                  : (isEditing ? "Guardar Cambios" : "Crear Asesor")
+                }
               </Button>
             </div>
           </form>

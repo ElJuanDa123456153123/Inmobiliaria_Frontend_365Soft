@@ -83,7 +83,7 @@ function PropiedadesContent() {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || "")
   const [useFullTextSearch, setUseFullTextSearch] = useState(!!searchParams.get('search'))
   const [showFilters, setShowFilters] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('split')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   const [filters, setFilters] = useState({
     operation: searchParams.get('operation') || "todas",
@@ -446,11 +446,56 @@ function PropiedadesContent() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* List Side */}
         {(viewMode === 'list' || viewMode === 'split') && (
-          <div className={`${viewMode === 'split' ? 'w-full lg:w-[45%] xl:w-[40%]' : 'w-full'} h-full overflow-y-auto scrollbar-hide border-r border-border`}>
-            <div className="p-4 md:p-6">
+          <div className={`${viewMode === 'split' ? 'w-full lg:w-[45%] xl:w-[40%]' : 'w-full'} h-full overflow-y-auto scrollbar-hide ${viewMode === 'list' ? '' : 'border-r border-border'}`}>
+            <div className={`p-4 md:p-6 mx-auto ${viewMode === 'list' ? 'max-w-[1100px]' : 'max-w-7xl'}`}>
+              {/* Header InfoCasas Style */}
+              <div className="mb-6">
+                {/* Title */}
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
+                  {filters.operation !== "todas"
+                    ? `${filters.operation.charAt(0).toUpperCase() + filters.operation.slice(1)} de inmuebles${filters.zona ? ` en ${filters.zona}` : ''}`
+                    : `Inmuebles${filters.zona ? ` en ${filters.zona}` : ''}`
+                  }
+                </h1>
+
+                {/* Breadcrumb */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                  <span>Estás en:</span>
+                  <span className="font-medium">Inmobiliaria</span>
+                  <span className="text-muted-foreground">&gt;</span>
+                  {filters.operation !== "todas" && (
+                    <>
+                      <span className="font-medium capitalize">{filters.operation}</span>
+                      <span className="text-muted-foreground">&gt;</span>
+                    </>
+                  )}
+                  <span className="font-medium">Inmuebles</span>
+                  {filters.zona && (
+                    <>
+                      <span className="text-muted-foreground">&gt;</span>
+                      <span className="font-medium">{filters.zona}</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Results Counter */}
+                <div className="text-sm text-muted-foreground">
+                  {!loading && total > 0 && (
+                    <span>
+                      Mostrando {(page - 1) * 12 + 1} - {Math.min(page * 12, total)} de más de {total.toLocaleString()} resultados
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-foreground">
-                  {loading ? 'Buscando...' : `${total.toLocaleString()} propiedades`}
+                  {loading ? 'Buscando...' : (
+                    filters.operation === 'venta' ? `${total.toLocaleString()} propiedades en venta` :
+                    filters.operation === 'alquiler' ? `${total.toLocaleString()} propiedades en alquiler` :
+                    filters.operation === 'anticretico' ? `${total.toLocaleString()} propiedades en anticrético` :
+                    `${total.toLocaleString()} propiedades`
+                  )}
                 </h2>
                 <Select value={filters.orderBy} onValueChange={(v) => handleFilterChange('orderBy', v)}>
                   <SelectTrigger className="w-[180px] h-9 border-none shadow-none focus:ring-0">
@@ -471,27 +516,43 @@ function PropiedadesContent() {
                 </div>
               ) : (
                 <>
-                  <div className={`grid gap-6 ${viewMode === 'split' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
-                    {properties.map((property) => (
-                      <PropertyCard
-                        key={property.id}
-                        id={property.id.toString()}
-                        title={property.titulo}
-                        location={property.zona}
-                        price={formatPrice(property)}
-                        operationType={property.tipo_operacion as any}
-                        bedrooms={property.dormitorios}
-                        bathrooms={property.banos}
-                        area={`${property.metros_edificados}m²`}
-                        image={
-                          property.property_images && property.property_images.length > 0
-                            ? getImageUrl(property.property_images.find(img => img.principal)?.image_url || property.property_images[0].image_url) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
-                            : "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
-                        }
-                        publishedDate={new Date(property.created_at).toLocaleDateString('es-BO')}
-                        featured={property.destacado}
-                      />
-                    ))}
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {properties.map((property) => {
+                      // Obtener imagen principal usando getImageUrl
+                      const mainImage = property.imagenes && property.imagenes.length > 0
+                        ? (property.imagenes.find(img => img.principal)?.image_url || property.imagenes[0].image_url)
+                        : null
+
+                      const mainImageUrl = mainImage
+                        ? (getImageUrl(mainImage) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop")
+                        : "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
+
+                      // Obtener todas las imágenes
+                      const allImages = property.imagenes && property.imagenes.length > 0
+                        ? property.imagenes.map(img => getImageUrl(img.image_url) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop")
+                        : []
+
+                      return (
+                        <PropertyCard
+                          key={property.id}
+                          id={property.id.toString()}
+                          title={property.titulo}
+                          location={property.zona}
+                          price={formatPrice(property)}
+                          operationType={property.tipo_operacion as any}
+                          bedrooms={property.dormitorios}
+                          bathrooms={property.banos}
+                          area={`${property.metros_edificados}m²`}
+                          image={mainImageUrl}
+                          publishedDate={new Date(property.created_at).toLocaleDateString('es-BO')}
+                          featured={property.destacado}
+                          description={property.descripcion}
+                          agentName={property.vendedor_nombre}
+                          agencyName={property.vendedor_nombre}
+                          images={allImages}
+                        />
+                      )
+                    })}
                   </div>
 
                   {properties.length === 0 && !loading && (

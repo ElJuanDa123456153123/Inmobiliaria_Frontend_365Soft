@@ -25,6 +25,13 @@ interface DatosOperacion {
   moneda: 'USD' | 'BOB'
   aceptaPermuta: boolean
   financia: boolean
+  // Campos específicos para alquiler
+  deposito?: string  // Ej: "1 mes", "2 meses"
+  plazoMinimo?: string  // Ej: "6 meses", "1 año"
+  serviciosIncluidos?: string[]  // ["luz", "agua", "internet"]
+  // Campos específicos para anticrético
+  duracionContrato?: string  // Ej: "1 año", "2 años"
+  opcionCompra?: boolean  // Opción de compra
 }
 
 interface DatosGenerales {
@@ -112,6 +119,11 @@ const initialState: {
     moneda: 'BOB',
     aceptaPermuta: false,
     financia: false,
+    deposito: '',
+    plazoMinimo: '',
+    serviciosIncluidos: [],
+    duracionContrato: '',
+    opcionCompra: false,
   },
   datosGenerales: {
     tipoPropiedad: '',

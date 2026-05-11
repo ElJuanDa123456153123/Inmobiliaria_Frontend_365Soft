@@ -1,4 +1,15 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3001'
+// Helper para obtener la URL del API en runtime (no en build time)
+const getApiUrl = () => {
+  // En el servidor, API_URL_INTERNAL está disponible en runtime
+  if (process.env.API_URL_INTERNAL) {
+    return process.env.API_URL_INTERNAL.replace('/api', '')
+  }
+  // En el cliente o fallback
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace('/api', '')
+  }
+  return 'http://localhost:3001'
+}
 
 interface UserProfile {
   id: number
@@ -135,6 +146,7 @@ interface Property {
   vendedor_telefono?: string
   vendedor_contacto?: string
   vendedor_horario?: string
+  mostrar_vendedor?: boolean // Toggle para mostrar/ocultar vendedor
   // Imágenes de la propiedad
   imagenes?: Array<{
     id: number
@@ -155,6 +167,7 @@ interface Property {
       telefono?: string
       especialidad?: string
       imagen_url?: string
+      avatar_url?: string
     }
   }>
 }
@@ -178,7 +191,7 @@ class ApiService {
 
   // Obtener perfil del usuario actual
   async getProfile(): Promise<UserProfile> {
-    const response = await fetch(`${API_URL}/api/auth/me`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/me`, {
       headers: this.getHeaders(),
     })
 
@@ -225,7 +238,7 @@ class ApiService {
       payload.nueva_password = data.nueva_password.trim()
     }
 
-    const response = await fetch(`${API_URL}/api/auth/profile`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/profile`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(payload),
@@ -236,7 +249,7 @@ class ApiService {
 
   // Actualizar datos públicos del vendedor
   async updateDatosPublicos(data: DatosPublicosRequest): Promise<{ message: string; user: UserProfile }> {
-    const response = await fetch(`${API_URL}/api/auth/datos-publicos`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/datos-publicos`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -257,7 +270,7 @@ class ApiService {
     const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 segundos
 
     try {
-      const response = await fetch(`${API_URL}/api/imagenes/upload`, {
+      const response = await fetch(`${getApiUrl()}/api/imagenes/upload`, {
         method: 'POST',
         headers: {
           // NO incluir Content-Type al usar FormData, el navegador lo establece automáticamente
@@ -285,9 +298,48 @@ class ApiService {
     }
   }
 
+  // Subir una imagen de avatar (separado de las imágenes de propiedades)
+  async uploadAvatar(file: File): Promise<{ url: string; filename: string; width: number; height: number }> {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    // Crear AbortController para timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 segundos
+
+    try {
+      const response = await fetch(`${getApiUrl()}/api/avatars/upload`, {
+        method: 'POST',
+        headers: {
+          // NO incluir Content-Type al usar FormData, el navegador lo establece automáticamente
+          ...(typeof window !== 'undefined' && localStorage.getItem('token')
+            ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            : {}),
+        },
+        body: formData,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Error al subir el avatar' }))
+        throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`)
+      }
+
+      return response.json()
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('La subida del avatar tomó demasiado tiempo. Intenta con una imagen más pequeña.')
+      }
+
+      throw error
+    }
+  }
+
   // Crear una nueva propiedad
   async createProperty(data: CreatePropertyRequest): Promise<{ message: string; property: Property }> {
-    const response = await fetch(`${API_URL}/api/properties`, {
+    const response = await fetch(`${getApiUrl()}/api/properties`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -298,7 +350,7 @@ class ApiService {
 
   // Obtener una propiedad por ID
   async getProperty(id: number): Promise<Property> {
-    const response = await fetch(`${API_URL}/api/properties/${id}`, {
+    const response = await fetch(`${getApiUrl()}/api/properties/${id}`, {
       headers: this.getHeaders(),
     })
 
@@ -324,8 +376,8 @@ class ApiService {
     if (params?.offset) queryParams.append('offset', params.offset.toString())
 
     const url = queryParams.toString()
-      ? `${API_URL}/api/properties?${queryParams.toString()}`
-      : `${API_URL}/api/properties`
+      ? `${getApiUrl()}/api/properties?${queryParams.toString()}`
+      : `${getApiUrl()}/api/properties`
 
     const response = await fetch(url, {
       headers: this.getHeaders(),
@@ -336,7 +388,7 @@ class ApiService {
 
   // Obtener propiedades del usuario actual
   async getMyProperties(): Promise<Property[]> {
-    const response = await fetch(`${API_URL}/api/properties/my`, {
+    const response = await fetch(`${getApiUrl()}/api/properties/my`, {
       headers: this.getHeaders(),
     })
 
@@ -345,7 +397,7 @@ class ApiService {
 
   // Actualizar estado de una propiedad
   async updatePropertyStatus(id: number, estado: string): Promise<{ message: string; property: Property }> {
-    const response = await fetch(`${API_URL}/api/properties/${id}/status`, {
+    const response = await fetch(`${getApiUrl()}/api/properties/${id}/status`, {
       method: 'PATCH',
       headers: this.getHeaders(),
       body: JSON.stringify({ estado }),
@@ -356,7 +408,7 @@ class ApiService {
 
   // Eliminar una propiedad
   async deleteProperty(id: number): Promise<{ message: string }> {
-    const response = await fetch(`${API_URL}/api/properties/${id}`, {
+    const response = await fetch(`${getApiUrl()}/api/properties/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
     })
@@ -366,4 +418,6 @@ class ApiService {
 }
 
 export const apiService = new ApiService()
+// Exportar como 'api' para compatibilidad con componentes existentes
+export const api = apiService
 export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property }

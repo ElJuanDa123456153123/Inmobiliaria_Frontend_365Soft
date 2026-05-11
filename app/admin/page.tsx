@@ -112,11 +112,14 @@ export default function AdminUsersPage() {
     }
   }
 
-  const filteredUsers = users.filter(user =>
-    user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.telefono.includes(searchTerm)
-  )
+  const filteredUsers = users.filter(user => {
+    // Solo mostrar usuarios normales, excluir admin, agentes e inmobiliarias
+    const isNormalUser = user.rol === "usuario"
+    const matchesSearch = user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.telefono.includes(searchTerm)
+    return isNormalUser && matchesSearch
+  })
 
   // Pagination logic
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
@@ -127,19 +130,6 @@ export default function AdminUsersPage() {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm])
-
-  const getRoleBadgeColor = (rol: string) => {
-    switch (rol) {
-      case "admin": return "bg-primary/10 text-primary border border-primary/20"
-      case "agente": return "bg-blue-100 text-blue-800 border border-blue-200"
-      case "inmobiliaria": return "bg-emerald-100 text-emerald-800 border border-emerald-200"
-      default: return "bg-muted text-muted-foreground border border-border"
-    }
-  }
-
-  const getRoleIcon = (rol: string) => {
-    return rol === "admin" ? <ShieldCheck className="h-4 w-4" /> : <Shield className="h-4 w-4" />
-  }
 
   if (loading) {
     return (
@@ -154,16 +144,16 @@ export default function AdminUsersPage() {
       {/* Header aligned with Login aesthetics */}
       <div className="mb-10">
         <h1 className="text-3xl font-bold text-foreground font-serif tracking-tight">Usuarios Registrados</h1>
-        <p className="text-muted-foreground mt-2">Gestiona de manera global todos los usuarios de la plataforma</p>
+        <p className="text-muted-foreground mt-2">Gestiona los usuarios normales que se registraron en la plataforma (excluye administradores y asesores)</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {[
-          { label: "Total Usuarios", count: users.length, colorClass: "text-foreground", bgIcon: "bg-primary/10", iconColor: "text-primary", icon: Shield },
-          { label: "Activos", count: users.filter(u => u.activo).length, colorClass: "text-emerald-600", bgIcon: "bg-emerald-100", iconColor: "text-emerald-600", icon: ShieldCheck },
-          { label: "Inactivos", count: users.filter(u => !u.activo).length, colorClass: "text-destructive", bgIcon: "bg-destructive/10", iconColor: "text-destructive", icon: Shield },
-          { label: "Verificados", count: users.filter(u => u.verificado).length, colorClass: "text-blue-600", bgIcon: "bg-blue-100", iconColor: "text-blue-600", icon: ShieldCheck },
+          { label: "Total Usuarios", count: users.filter(u => u.rol === "usuario").length, colorClass: "text-foreground", bgIcon: "bg-primary/10", iconColor: "text-primary", icon: Shield },
+          { label: "Activos", count: users.filter(u => u.rol === "usuario" && u.activo).length, colorClass: "text-emerald-600", bgIcon: "bg-emerald-100", iconColor: "text-emerald-600", icon: ShieldCheck },
+          { label: "Inactivos", count: users.filter(u => u.rol === "usuario" && !u.activo).length, colorClass: "text-destructive", bgIcon: "bg-destructive/10", iconColor: "text-destructive", icon: Shield },
+          { label: "Verificados", count: users.filter(u => u.rol === "usuario" && u.verificado).length, colorClass: "text-blue-600", bgIcon: "bg-blue-100", iconColor: "text-blue-600", icon: ShieldCheck },
         ].map((stat, idx) => (
           <div key={idx} className="bg-background rounded-xl shadow-sm border border-border p-6 flex items-center justify-between">
             <div>
@@ -203,7 +193,6 @@ export default function AdminUsersPage() {
                 <th className="px-6 py-4">ID</th>
                 <th className="px-6 py-4">Usuario</th>
                 <th className="px-6 py-4">Contacto</th>
-                <th className="px-6 py-4">Rol</th>
                 <th className="px-6 py-4">Estado</th>
                 <th className="px-6 py-4">Registro</th>
                 <th className="px-6 py-4 text-right">Acciones</th>
@@ -212,7 +201,7 @@ export default function AdminUsersPage() {
             <tbody className="divide-y divide-border bg-background">
               {currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={6} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Shield className="h-10 w-10 mb-3 opacity-50" />
                       <p className="text-base font-medium">No se encontraron usuarios</p>
@@ -240,12 +229,6 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                       {user.telefono}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider ${getRoleBadgeColor(user.rol)}`}>
-                        {getRoleIcon(user.rol)}
-                        {user.rol}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${

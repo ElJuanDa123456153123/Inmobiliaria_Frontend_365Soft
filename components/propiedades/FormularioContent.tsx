@@ -18,6 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { AlertTriangle } from "lucide-react"
 
 // Dynamically import components with SSR disabled
 const MapaSelector = dynamicImport(() => import("@/components/mapa/MapaSelector"), { ssr: false })
@@ -43,6 +54,7 @@ export function FormularioContent() {
   const [publishing, setPublishing] = useState(false)
   const [mapaCentro, setMapaCentro] = useState<{ lat: number; lng: number } | undefined>()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [mostrarDialogoCancelar, setMostrarDialogoCancelar] = useState(false)
   const {
     pasoActual,
     datosOperacion,
@@ -164,7 +176,7 @@ export function FormularioContent() {
         }))
 
       // Preparar payload con todos los datos del formulario
-      const payload = {
+      const payload: any = {
         // === PASO 1: Datos de la operación ===
         titulo: datosOperacion.titulo.trim(),
         tipo_operacion: datosOperacion.tipoOperacion,
@@ -172,6 +184,17 @@ export function FormularioContent() {
         moneda: datosOperacion.moneda,
         acepta_permuta: datosOperacion.aceptaPermuta,
         financia: datosOperacion.financia,
+
+        // Campos específicos por operación
+        ...(datosOperacion.tipoOperacion === 'alquiler' && {
+          deposito: datosOperacion.deposito,
+          plazo_minimo: datosOperacion.plazoMinimo,
+          servicios_incluidos: datosOperacion.serviciosIncluidos,
+        }),
+        ...(datosOperacion.tipoOperacion === 'anticretico' && {
+          duracion_contrato: datosOperacion.duracionContrato,
+          opcion_compra: datosOperacion.opcionCompra,
+        }),
 
         // === PASO 2: Datos generales ===
         tipo_propiedad: datosGenerales.tipoPropiedad,
@@ -229,6 +252,31 @@ export function FormularioContent() {
       toast.error(error.message || 'Error al publicar la propiedad')
     } finally {
       setPublishing(false)
+    }
+  }
+
+  const handleCancelar = () => {
+    setMostrarDialogoCancelar(true)
+  }
+
+  const confirmarCancelar = () => {
+    // Resetear formulario
+    resetFormulario()
+    // Limpiar localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('formulario-publicacion-storage')
+    }
+    // Mostrar toast
+    toast.info('Publicación cancelada', {
+      description: 'Los datos han sido descartados',
+    })
+    // Cerrar diálogo
+    setMostrarDialogoCancelar(false)
+    // Redirigir al home o según el rol
+    if (isAdmin) {
+      router.push('/admin/propiedades')
+    } else {
+      router.push('/')
     }
   }
 
@@ -296,6 +344,15 @@ export function FormularioContent() {
                   <p className="text-sm text-gray-600 mt-2">
                     {calcularProgreso()}% del progreso
                   </p>
+
+                  {/* Botón Cancelar */}
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelar}
+                    className="w-full mt-4 bg-red-600 text-white border-red-600 hover:bg-red-700 hover:border-red-700 hover:text-white font-semibold"
+                  >
+                    Cancelar publicación
+                  </Button>
                 </div>
               </div>
             </div>
@@ -355,7 +412,11 @@ export function FormularioContent() {
 
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Precio de venta <span className="text-red-500">*</span>
+                          {datosOperacion.tipoOperacion === 'venta' && 'Precio de venta'}
+                          {datosOperacion.tipoOperacion === 'alquiler' && 'Precio mensual de alquiler'}
+                          {datosOperacion.tipoOperacion === 'anticretico' && 'Monto de anticrético'}
+                          {!datosOperacion.tipoOperacion && 'Precio'}
+                          <span className="text-red-500">*</span>
                         </label>
                         <div className="flex gap-2">
                           <Select value={datosOperacion.moneda} onValueChange={(value) => setDatosOperacion({ moneda: value as any })}>
@@ -371,10 +432,16 @@ export function FormularioContent() {
                             type="number"
                             value={datosOperacion.precio}
                             onChange={(e) => setDatosOperacion({ precio: e.target.value })}
-                            placeholder=""
+                            placeholder={datosOperacion.tipoOperacion === 'alquiler' ? 'Ej: 500' : datosOperacion.tipoOperacion === 'anticretico' ? 'Ej: 50000' : 'Ej: 120000'}
                             className="flex-1 bg-gray-50 border-gray-300"
                           />
                         </div>
+                        {datosOperacion.tipoOperacion === 'alquiler' && (
+                          <p className="text-xs text-gray-500 mt-1">Precio mensual en {datosOperacion.moneda === 'USD' ? 'dólares' : 'bolivianos'}</p>
+                        )}
+                        {datosOperacion.tipoOperacion === 'anticretico' && (
+                          <p className="text-xs text-gray-500 mt-1">Monto del anticrético en {datosOperacion.moneda === 'USD' ? 'dólares' : 'bolivianos'}</p>
+                        )}
                       </div>
 
                       <div>
@@ -428,6 +495,156 @@ export function FormularioContent() {
                           </label>
                         </div>
                       </div>
+
+                      {/* Campos específicos para ALQUILER */}
+                      {datosOperacion.tipoOperacion === 'alquiler' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Depósito / Garantía:
+                            </label>
+                            <Select
+                              value={datosOperacion.deposito || ''}
+                              onValueChange={(value) => {
+                                if (value !== 'personalizado') {
+                                  setDatosOperacion({ deposito: value })
+                                } else {
+                                  setDatosOperacion({ deposito: '' })
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="bg-gray-50 border-gray-300">
+                                <SelectValue placeholder="Selecciona" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1 mes">1 mes</SelectItem>
+                                <SelectItem value="2 meses">2 meses</SelectItem>
+                                <SelectItem value="3 meses">3 meses</SelectItem>
+                                <SelectItem value="6 meses">6 meses</SelectItem>
+                                <SelectItem value="personalizado">Personalizado...</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {(!datosOperacion.deposito || datosOperacion.deposito === 'personalizado') && (
+                              <Input
+                                type="text"
+                                value={datosOperacion.deposito === 'personalizado' ? '' : datosOperacion.deposito || ''}
+                                onChange={(e) => setDatosOperacion({ deposito: e.target.value })}
+                                placeholder="Escribe el depósito personalizado"
+                                className="bg-gray-50 border-gray-300 mt-2"
+                              />
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Plazo mínimo de contrato:
+                            </label>
+                            <Select
+                              value={datosOperacion.plazoMinimo || ''}
+                              onValueChange={(value) => {
+                                if (value !== 'personalizado') {
+                                  setDatosOperacion({ plazoMinimo: value })
+                                } else {
+                                  setDatosOperacion({ plazoMinimo: '' })
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="bg-gray-50 border-gray-300">
+                                <SelectValue placeholder="Selecciona" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="3 meses">3 meses</SelectItem>
+                                <SelectItem value="6 meses">6 meses</SelectItem>
+                                <SelectItem value="1 año">1 año</SelectItem>
+                                <SelectItem value="2 años">2 años</SelectItem>
+                                <SelectItem value="3 años">3 años</SelectItem>
+                                <SelectItem value="personalizado">Personalizado...</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {(!datosOperacion.plazoMinimo || datosOperacion.plazoMinimo === 'personalizado') && (
+                              <Input
+                                type="text"
+                                value={datosOperacion.plazoMinimo === 'personalizado' ? '' : datosOperacion.plazoMinimo || ''}
+                                onChange={(e) => setDatosOperacion({ plazoMinimo: e.target.value })}
+                                placeholder="Escribe el plazo personalizado"
+                                className="bg-gray-50 border-gray-300 mt-2"
+                              />
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-3">
+                              Servicios incluidos:
+                            </label>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              {[
+                                { value: 'luz', label: 'Luz' },
+                                { value: 'agua', label: 'Agua' },
+                                { value: 'gas', label: 'Gas' },
+                                { value: 'internet', label: 'Internet' },
+                                { value: 'cable', label: 'Cable TV' },
+                                { value: 'mantenimiento', label: 'Mantenimiento' },
+                              ].map((servicio) => (
+                                <label key={servicio.value} className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={datosOperacion.serviciosIncluidos?.includes(servicio.value) || false}
+                                    onChange={(e) => {
+                                      const current = datosOperacion.serviciosIncluidos || []
+                                      if (e.target.checked) {
+                                        setDatosOperacion({ serviciosIncluidos: [...current, servicio.value] })
+                                      } else {
+                                        setDatosOperacion({ serviciosIncluidos: current.filter(s => s !== servicio.value) })
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                  />
+                                  <span className="text-sm">{servicio.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Campos específicos para ANTICRÉTICO */}
+                      {datosOperacion.tipoOperacion === 'anticretico' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Duración del contrato:
+                            </label>
+                            <Select value={datosOperacion.duracionContrato || ''} onValueChange={(value) => setDatosOperacion({ duracionContrato: value })}>
+                              <SelectTrigger className="bg-gray-50 border-gray-300">
+                                <SelectValue placeholder="Selecciona" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1 año">1 año</SelectItem>
+                                <SelectItem value="2 años">2 años</SelectItem>
+                                <SelectItem value="3 años">3 años</SelectItem>
+                                <SelectItem value="5 años">5 años</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={datosOperacion.opcionCompra || false}
+                                onChange={(e) => setDatosOperacion({ opcionCompra: e.target.checked })}
+                                className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
+                              />
+                              <span className="text-sm font-semibold text-gray-700">
+                                Opción de compra
+                              </span>
+                            </label>
+                            <p className="text-xs text-gray-500 ml-7 mt-1">
+                              El inquilino tiene opción a comprar la propiedad al finalizar el contrato
+                            </p>
+                          </div>
+                        </>
+                      )}
 
                       <div className="flex justify-end pt-4">
                         <Button onClick={handleNextStep} className="bg-primary hover:bg-primary/90">
@@ -1012,6 +1229,36 @@ export function FormularioContent() {
       </main>
 
       {!isAdmin && <Footer />}
+
+      {/* Diálogo de confirmación para cancelar */}
+      <AlertDialog open={mostrarDialogoCancelar} onOpenChange={setMostrarDialogoCancelar}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <AlertDialogTitle>¿Cancelar publicación?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base mt-4">
+              Esta acción descartará todos los datos ingresados y no podrás recuperar la publicación.
+              <br /><br />
+              <strong>¿Estás seguro de que deseas cancelar?</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="mt-0">
+              No, volver al formulario
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarCancelar}
+              className="bg-red-600 hover:bg-red-700 mt-0"
+            >
+              Sí, cancelar publicación
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

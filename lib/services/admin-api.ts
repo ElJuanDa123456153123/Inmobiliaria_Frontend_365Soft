@@ -1,5 +1,12 @@
-const BASE_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
-const ADMIN_API_URL = `${BASE_API_URL}/admin`
+// Obtener la URL del API admin según el contexto (igual que en api.ts)
+const getAdminApiUrl = () => {
+  // Si estamos en el servidor, usar API_URL_INTERNAL
+  if (typeof window === 'undefined') {
+    return `${process.env.API_URL_INTERNAL || 'http://backend:3001'}/api/admin`
+  }
+  // Si estamos en el cliente, usar NEXT_PUBLIC_API_URL
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/admin`
+}
 
 // ==================== INTERFACES ====================
 
@@ -55,10 +62,12 @@ export interface AdminProperty {
     email: string
     especialidad: string
   }
-  property_images?: PropertyImage[]
+  imagenes?: PropertyImage[]
+  asesores_asignados?: Advisor[] // Array de asesores asignados a la propiedad
   vendedor_nombre: string
   vendedor_email?: string
   vendedor_telefono?: string
+  mostrar_vendedor: boolean
 }
 
 export interface PropertyImage {
@@ -73,7 +82,9 @@ export interface Advisor {
   email: string
   telefono?: string
   especialidad?: string
-  imagen_url?: string // Nueva: foto de perfil del asesor
+  imagen_url?: string // Campo antiguo, mantener por compatibilidad
+  avatar_url?: string // Nuevo campo de avatar
+  user_id?: number
   activo: boolean
   created_at: string
   updated_at: string
@@ -162,11 +173,13 @@ export interface UpdatePropertyRequest {
   descripcion?: string
   terminos_condiciones?: string
   advisor_id?: number
+  mostrar_vendedor?: boolean
 }
 
 export interface CreateAdvisorRequest {
   nombre: string
   email: string
+  password: string
   telefono?: string
   especialidad?: string
   imagen_url?: string // Nueva: foto de perfil
@@ -176,6 +189,7 @@ export interface CreateAdvisorRequest {
 export interface UpdateAdvisorRequest {
   nombre?: string
   email?: string
+  password?: string
   telefono?: string
   especialidad?: string
   imagen_url?: string // Nueva: foto de perfil
@@ -242,7 +256,7 @@ class AdminApiService {
     if (params?.advisor_id && params.advisor_id !== '') queryParams.append('advisor_id', params.advisor_id.toString())
     if (params?.search) queryParams.append('search', params.search)
 
-    const response = await fetch(`${ADMIN_API_URL}/properties?${queryParams}`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties?${queryParams}`, {
       headers: this.getHeaders(),
     })
 
@@ -250,7 +264,7 @@ class AdminApiService {
   }
 
   async getProperty(id: number): Promise<AdminProperty> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${id}`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${id}`, {
       headers: this.getHeaders(),
     })
 
@@ -258,7 +272,7 @@ class AdminApiService {
   }
 
   async createProperty(data: CreatePropertyRequest): Promise<{ message: string; property: AdminProperty }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -268,7 +282,7 @@ class AdminApiService {
   }
 
   async updateProperty(id: number, data: UpdatePropertyRequest): Promise<{ message: string; property: AdminProperty }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${id}`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -278,7 +292,7 @@ class AdminApiService {
   }
 
   async updatePropertyStatus(id: number, estado: string): Promise<{ message: string; property: AdminProperty }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${id}/status`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${id}/status`, {
       method: 'PATCH',
       headers: this.getHeaders(),
       body: JSON.stringify({ estado }),
@@ -288,7 +302,7 @@ class AdminApiService {
   }
 
   async toggleFeatured(id: number, destacado: boolean): Promise<{ message: string; property: AdminProperty }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${id}/featured`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${id}/featured`, {
       method: 'PATCH',
       headers: this.getHeaders(),
       body: JSON.stringify({ destacado }),
@@ -298,7 +312,7 @@ class AdminApiService {
   }
 
   async deleteProperty(id: number): Promise<{ message: string }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${id}`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
     })
@@ -307,7 +321,7 @@ class AdminApiService {
   }
 
   async assignAdvisor(propertyId: number, advisorId: number | null): Promise<{ message: string; property: AdminProperty }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${propertyId}/advisor`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${propertyId}/advisor`, {
       method: 'PATCH',
       headers: this.getHeaders(),
       body: JSON.stringify({ advisor_id: advisorId }),
@@ -317,7 +331,7 @@ class AdminApiService {
   }
 
   async getPropertiesStats(periodo: '7d' | '30d' | '90d' | 'all' = '30d'): Promise<PropertiesStatsResponse> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/stats?periodo=${periodo}`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/stats?periodo=${periodo}`, {
       headers: this.getHeaders(),
     })
 
@@ -333,7 +347,7 @@ class AdminApiService {
     if (params?.activo !== undefined) queryParams.append('activo', params.activo.toString())
     if (params?.search) queryParams.append('search', params.search)
 
-    const response = await fetch(`${ADMIN_API_URL}/advisors?${queryParams}`, {
+    const response = await fetch(`${getAdminApiUrl()}/advisors?${queryParams}`, {
       headers: this.getHeaders(),
     })
 
@@ -341,7 +355,7 @@ class AdminApiService {
   }
 
   async getAdvisor(id: number): Promise<Advisor> {
-    const response = await fetch(`${ADMIN_API_URL}/advisors/${id}`, {
+    const response = await fetch(`${getAdminApiUrl()}/advisors/${id}`, {
       headers: this.getHeaders(),
     })
 
@@ -349,7 +363,7 @@ class AdminApiService {
   }
 
   async createAdvisor(data: CreateAdvisorRequest): Promise<{ message: string; advisor: Advisor }> {
-    const response = await fetch(`${ADMIN_API_URL}/advisors`, {
+    const response = await fetch(`${getAdminApiUrl()}/advisors`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -359,7 +373,7 @@ class AdminApiService {
   }
 
   async updateAdvisor(id: number, data: UpdateAdvisorRequest): Promise<{ message: string; advisor: Advisor }> {
-    const response = await fetch(`${ADMIN_API_URL}/advisors/${id}`, {
+    const response = await fetch(`${getAdminApiUrl()}/advisors/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -369,7 +383,7 @@ class AdminApiService {
   }
 
   async deleteAdvisor(id: number): Promise<{ message: string }> {
-    const response = await fetch(`${ADMIN_API_URL}/advisors/${id}`, {
+    const response = await fetch(`${getAdminApiUrl()}/advisors/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
     })
@@ -378,7 +392,7 @@ class AdminApiService {
   }
 
   async toggleAdvisorActive(id: number): Promise<{ message: string; advisor: Advisor }> {
-    const response = await fetch(`${ADMIN_API_URL}/advisors/${id}/toggle-active`, {
+    const response = await fetch(`${getAdminApiUrl()}/advisors/${id}/toggle-active`, {
       method: 'PATCH',
       headers: this.getHeaders(),
     })
@@ -390,7 +404,7 @@ class AdminApiService {
 
   // Obtener todos los asesores asignados a una propiedad
   async getPropertyAdvisors(propertyId: number): Promise<{ advisors: Advisor[]; total: number }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${propertyId}/advisors`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${propertyId}/advisors`, {
       headers: this.getHeaders(),
     })
 
@@ -399,7 +413,7 @@ class AdminApiService {
 
   // Asignar un asesor a una propiedad (soporta múltiples)
   async assignAdvisorToProperty(propertyId: number, advisorId: number): Promise<{ message: string; advisor: Advisor }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${propertyId}/advisors`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${propertyId}/advisors`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ advisor_id: advisorId }),
@@ -410,7 +424,7 @@ class AdminApiService {
 
   // Eliminar un asesor de una propiedad
   async removeAdvisorFromProperty(propertyId: number, advisorId: number): Promise<{ message: string }> {
-    const response = await fetch(`${ADMIN_API_URL}/properties/${propertyId}/advisors/${advisorId}`, {
+    const response = await fetch(`${getAdminApiUrl()}/properties/${propertyId}/advisors/${advisorId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
     })

@@ -35,20 +35,26 @@ export default function LoginPage() {
         return
       }
 
+      // DEBUG: Ver qué está recibiendo del backend
+      console.log("Datos del backend:", data)
+      console.log("Rol del usuario:", data.user?.rol)
+
       // Guardar token y nombre de usuario
       localStorage.setItem("token", data.token)
       localStorage.setItem("userName", data.user?.nombre || data.nombre || data.usuario?.nombre || "Usuario")
 
-      // Verificar si es administrador
+      // Verificar si es administrador o asesor (agente)
       if (data.user?.rol === "admin") {
         localStorage.setItem("isAdmin", "true")
+      } else if (data.user?.rol === "agente") {
+        localStorage.setItem("isAdvisor", "true")
       }
 
       // Disparar evento para actualizar el header
       window.dispatchEvent(new Event("auth-change"))
 
-      // Si es admin, redirigir al panel de administración
-      if (data.user?.rol === "admin") {
+      // Si es admin o asesor (agente), redirigir al panel de administración
+      if (data.user?.rol === "admin" || data.user?.rol === "agente") {
         setSuccess(true)
         setTimeout(() => {
           router.push("/admin")

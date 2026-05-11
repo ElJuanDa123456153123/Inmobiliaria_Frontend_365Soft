@@ -94,22 +94,73 @@ export default function ResumenPublicacion({
                 {datosOperacion.moneda === 'USD' ? 'U$S' : 'Bs'} {datosOperacion.precio}
               </p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Condiciones</p>
-              <div className="flex gap-4 mt-1">
-                {datosOperacion.aceptaPermuta && (
-                  <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
-                    ✓ Acepta permuta
-                  </span>
-                )}
-                {datosOperacion.financia && (
-                  <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                    ✓ Financia
-                  </span>
-                )}
+            {/* Condiciones solo para VENTA */}
+            {(datosOperacion.aceptaPermuta || datosOperacion.financia) && (
+              <div>
+                <p className="text-sm text-gray-600">Condiciones</p>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {datosOperacion.aceptaPermuta && (
+                    <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
+                      ✓ Acepta permuta
+                    </span>
+                  )}
+                  {datosOperacion.financia && (
+                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      ✓ Financia
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
+
+          {/* Campos específicos para ALQUILER */}
+          {datosOperacion.tipoOperacion === 'alquiler' && (
+            <div className="mt-4 pt-4 border-t grid md:grid-cols-2 gap-4">
+              {datosOperacion.deposito && (
+                <div>
+                  <p className="text-sm text-gray-600">Depósito / Garantía</p>
+                  <p className="font-semibold">{datosOperacion.deposito}</p>
+                </div>
+              )}
+              {datosOperacion.plazoMinimo && (
+                <div>
+                  <p className="text-sm text-gray-600">Plazo mínimo</p>
+                  <p className="font-semibold">{datosOperacion.plazoMinimo}</p>
+                </div>
+              )}
+              {datosOperacion.serviciosIncluidos && datosOperacion.serviciosIncluidos.length > 0 && (
+                <div className="md:col-span-2">
+                  <p className="text-sm text-gray-600 mb-2">Servicios incluidos</p>
+                  <div className="flex flex-wrap gap-2">
+                    {datosOperacion.serviciosIncluidos.map((servicio: string, index: number) => (
+                      <span key={`servicio-${index}`} className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                        ✓ {servicio}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Campos específicos para ANTICRÉTICO */}
+          {datosOperacion.tipoOperacion === 'anticretico' && (
+            <div className="mt-4 pt-4 border-t grid md:grid-cols-2 gap-4">
+              {datosOperacion.duracionContrato && (
+                <div>
+                  <p className="text-sm text-gray-600">Duración del contrato</p>
+                  <p className="font-semibold">{datosOperacion.duracionContrato}</p>
+                </div>
+              )}
+              {datosOperacion.opcionCompra && (
+                <div>
+                  <p className="text-sm text-gray-600">Opción de compra</p>
+                  <p className="font-semibold text-green-600">✓ Sí</p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
