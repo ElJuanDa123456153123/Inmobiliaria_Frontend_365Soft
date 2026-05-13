@@ -45,6 +45,12 @@ export default function PlanesPage() {
   const fetchPlanes = async () => {
     try {
       const token = localStorage.getItem("token")
+      if (!token) {
+        setError("No has iniciado sesión. Redirigiendo...")
+        window.location.href = "/login"
+        return
+      }
+
       const response = await fetch("http://localhost:3001/api/admin/planes", {
         headers: {
           "Authorization": `Bearer ${token}`
@@ -54,11 +60,25 @@ export default function PlanesPage() {
       if (response.ok) {
         const data = await response.json()
         setPlanes(data.planes || [])
+        setError("")
+      } else if (response.status === 401) {
+        // Token inválido o expirado
+        localStorage.removeItem("token")
+        localStorage.removeItem("isAdmin")
+        localStorage.removeItem("isAdvisor")
+        localStorage.removeItem("userName")
+        setError("Tu sesión ha expirado. Redirigiendo al login...")
+        setTimeout(() => {
+          window.location.href = "/login"
+        }, 2000)
+      } else if (response.status === 403) {
+        setError("No tienes permisos para gestionar planes. Inicia sesión como administrador.")
       } else {
-        console.error("Error response from server:", response.status)
+        setError(`Error del servidor (${response.status}). Intenta de nuevo.`)
       }
     } catch (err) {
       console.error("Error fetching planes:", err)
+      setError("Error de conexión con el servidor")
     } finally {
       setLoading(false)
     }

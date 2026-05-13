@@ -43,8 +43,8 @@ export default function LoginPage() {
       localStorage.setItem("token", data.token)
       localStorage.setItem("userName", data.user?.nombre || data.nombre || data.usuario?.nombre || "Usuario")
 
-      // Verificar si es administrador o asesor (agente)
-      if (data.user?.rol === "admin") {
+      // Verificar si es administrador, asesor (agente) o inmobiliaria
+      if (data.user?.rol === "admin" || data.user?.rol === "inmobiliaria") {
         localStorage.setItem("isAdmin", "true")
       } else if (data.user?.rol === "agente") {
         localStorage.setItem("isAdvisor", "true")
@@ -53,8 +53,8 @@ export default function LoginPage() {
       // Disparar evento para actualizar el header
       window.dispatchEvent(new Event("auth-change"))
 
-      // Si es admin o asesor (agente), redirigir al panel de administración
-      if (data.user?.rol === "admin" || data.user?.rol === "agente") {
+      // Si es admin, asesor (agente) o inmobiliaria, redirigir al panel de administración
+      if (data.user?.rol === "admin" || data.user?.rol === "agente" || data.user?.rol === "inmobiliaria") {
         setSuccess(true)
         setTimeout(() => {
           router.push("/admin")

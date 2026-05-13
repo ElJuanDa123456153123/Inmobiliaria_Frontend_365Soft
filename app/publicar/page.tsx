@@ -1,84 +1,83 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Check, X, Home, DollarSign, Clock, Star, Zap } from "lucide-react"
+import { Check, X, Home, DollarSign, Clock, Star, Zap, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 
+// Interface que coincide con el modelo del backend
 interface Plan {
-  id: string
+  id: number
   nombre: string
-  precio: string
-  duracion: string
-  exposicion: string
-  caracteristicas: {
-    texto: string
-    incluido: boolean
-  }[]
-  color: string
+  precio: number
+  descripcion: string
+  duracion_meses: number
+  limite_propiedades: number
+  caracteristicas: string // Separadas por comas
+  destacado: boolean
+  activo: boolean
+  orden: number
 }
 
-const planes: Plan[] = [
-  {
-    id: "basico",
-    nombre: "Plan Básico",
-    precio: "U$S 40",
-    duracion: "30 días",
-    exposicion: "Buena exposición",
-    color: "from-gray-500 to-gray-600",
-    caracteristicas: [
-      { texto: "30 días de publicación", incluido: true },
-      { texto: "Hasta 10 fotos", incluido: true },
-      { texto: "Buena visibilidad", incluido: true },
-      { texto: "Destacado en búsquedas", incluido: false },
-      { texto: "Prioridad en resultados", incluido: false },
-      { texto: "Publicación en redes sociales", incluido: false },
-    ]
-  },
-  {
-    id: "oro",
-    nombre: "Plan Oro",
-    precio: "U$S 60",
-    duracion: "60 días",
-    exposicion: "Muy buena exposición",
-    color: "from-amber-500 to-amber-600",
-    caracteristicas: [
-      { texto: "60 días de publicación", incluido: true },
-      { texto: "Hasta 20 fotos", incluido: true },
-      { texto: "Muy buena visibilidad", incluido: true },
-      { texto: "Destacado en búsquedas", incluido: true },
-      { texto: "Prioridad en resultados", incluido: false },
-      { texto: "Publicación en redes sociales", incluido: false },
-    ]
-  },
-  {
-    id: "diamante",
-    nombre: "Plan Diamante",
-    precio: "U$S 100",
-    duracion: "Hasta que se venda",
-    exposicion: "Máxima exposición",
-    color: "from-cyan-500 to-cyan-600",
-    caracteristicas: [
-      { texto: "Hasta que se venda", incluido: true },
-      { texto: "Fotos ilimitadas", incluido: true },
-      { texto: "Máxima visibilidad", incluido: true },
-      { texto: "Destacado en búsquedas", incluido: true },
-      { texto: "Prioridad en resultados", incluido: true },
-      { texto: "Publicación en redes sociales", incluido: true },
-    ]
-  }
+// Colores del gradiente basados en el orden/posición del plan
+const planColors = [
+  "from-gray-500 to-gray-600",
+  "from-amber-500 to-amber-600",
+  "from-cyan-500 to-cyan-600",
+  "from-violet-500 to-violet-600",
+  "from-emerald-500 to-emerald-600",
+  "from-rose-500 to-rose-600",
 ]
+
+function getColorForPlan(index: number): string {
+  return planColors[index % planColors.length]
+}
+
+function getDuracionLabel(meses: number): string {
+  if (meses <= 0) return "Hasta que se venda"
+  if (meses === 1) return "30 días"
+  return `${meses} meses`
+}
 
 function PublicarContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tipo = searchParams.get("tipo")
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<number | null>(null)
+  const [planes, setPlanes] = useState<Plan[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSelectPlan = (planId: string) => {
+  useEffect(() => {
+    fetchPlanes()
+  }, [])
+
+  const fetchPlanes = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+      const response = await fetch(`${apiUrl}/planes`)
+
+      if (!response.ok) {
+        throw new Error("Error al obtener los planes")
+      }
+
+      const data = await response.json()
+      setPlanes(data.planes || [])
+    } catch (err: any) {
+      console.error("Error fetching planes:", err)
+      setError("No se pudieron cargar los planes. Intenta de nuevo más tarde.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSelectPlan = (planId: number) => {
     setSelectedPlan(planId)
     // Redirigir al formulario de registro con el plan seleccionado
     router.push(`/publicar/registro?plan=${planId}`)
@@ -87,6 +86,12 @@ function PublicarContent() {
   const handleContinueWithoutPlan = () => {
     // Redirigir al formulario de registro sin plan seleccionado
     router.push("/publicar/registro")
+  }
+
+  // Parsear características del string separado por comas
+  const parseCaracteristicas = (caracteristicas: string): string[] => {
+    if (!caracteristicas || caracteristicas.trim() === "") return []
+    return caracteristicas.split(",").map((c) => c.trim()).filter((c) => c.length > 0)
   }
 
   return (
@@ -145,7 +150,7 @@ function PublicarContent() {
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                   <DollarSign className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">MejorPrecio</h3>
+                <h3 className="text-xl font-semibold mb-2">Mejor Precio</h3>
                 <p className="text-gray-600">
                   Planes accesibles para todos los presupuestos. Elige el que mejor se adapte a tus necesidades
                 </p>
@@ -226,64 +231,119 @@ function PublicarContent() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              {planes.map((plan) => (
-                <Card
-                  key={plan.id}
-                  className={`relative overflow-hidden transition-all hover:shadow-xl ${
-                    plan.id === "diamante" ? "ring-2 ring-primary shadow-lg scale-105" : ""
-                  }`}
-                >
-                  {plan.id === "diamante" && (
-                    <div className="absolute top-0 right-0 bg-gradient-to-l from-primary to-primary/80 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
-                      Recomendado
-                    </div>
-                  )}
+            {/* Loading state */}
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-16">
+                <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+                <p className="text-gray-500">Cargando planes disponibles...</p>
+              </div>
+            )}
 
-                  <CardHeader className={`bg-gradient-to-r ${plan.color} text-white`}>
-                    <CardTitle className="text-2xl">{plan.nombre}</CardTitle>
-                    <div className="mt-4">
-                      <div className="text-4xl font-bold">{plan.precio}</div>
-                      <div className="text-white/90 mt-1">{plan.duracion}</div>
-                    </div>
-                  </CardHeader>
+            {/* Error state */}
+            {error && !loading && (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md text-center">
+                  <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+                  <p className="text-red-600 mb-4">{error}</p>
+                  <Button onClick={fetchPlanes} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+                    Reintentar
+                  </Button>
+                </div>
+              </div>
+            )}
 
-                  <CardContent className="p-6">
-                    <div className="mb-4">
-                      <span className="text-sm font-medium text-gray-600">Exposición:</span>
-                      <span className="ml-2 text-sm font-semibold text-gray-900">{plan.exposicion}</span>
-                    </div>
+            {/* Empty state */}
+            {!loading && !error && planes.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-8 max-w-md text-center">
+                  <DollarSign className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 mb-2">No hay planes disponibles en este momento</p>
+                  <p className="text-gray-400 text-sm">Puedes continuar y seleccionar un plan más tarde</p>
+                </div>
+              </div>
+            )}
 
-                    <ul className="space-y-3 mb-6">
-                      {plan.caracteristicas.map((caracteristica, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          {caracteristica.incluido ? (
-                            <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                          ) : (
-                            <X className="w-5 h-5 text-gray-300 flex-shrink-0 mt-0.5" />
-                          )}
-                          <span className={`text-sm ${caracteristica.incluido ? "text-gray-700" : "text-gray-400"}`}>
-                            {caracteristica.texto}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+            {/* Plans grid */}
+            {!loading && !error && planes.length > 0 && (
+              <div className={`grid gap-6 mb-8 ${
+                planes.length === 1 ? "md:grid-cols-1 max-w-md mx-auto" :
+                planes.length === 2 ? "md:grid-cols-2 max-w-3xl mx-auto" :
+                "md:grid-cols-3"
+              }`}>
+                {planes.map((plan, index) => {
+                  const caracteristicas = parseCaracteristicas(plan.caracteristicas)
+                  const color = getColorForPlan(index)
+                  const duracionLabel = getDuracionLabel(plan.duracion_meses)
 
-                    <Button
-                      onClick={() => handleSelectPlan(plan.id)}
-                      className={`w-full ${
-                        plan.id === "diamante"
-                          ? "bg-primary hover:bg-primary/90"
-                          : "bg-gray-800 hover:bg-gray-900"
+                  return (
+                    <Card
+                      key={plan.id}
+                      className={`relative flex flex-col h-full overflow-hidden transition-all hover:shadow-xl ${
+                        plan.destacado ? "ring-2 ring-primary shadow-lg scale-105 z-10" : ""
                       }`}
-                      size="lg"
                     >
-                      Continuar
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      {plan.destacado && (
+                        <div className="absolute top-0 right-0 bg-gradient-to-l from-primary to-primary/80 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg z-10">
+                          Recomendado
+                        </div>
+                      )}
+
+                      <CardHeader className={`bg-gradient-to-r ${color} text-white`}>
+                        <CardTitle className="text-2xl">{plan.nombre}</CardTitle>
+                        <div className="mt-4">
+                          <div className="text-4xl font-bold">{plan.precio} Bs.</div>
+                          <div className="text-white/90 mt-1 flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {duracionLabel}
+                          </div>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="p-6 flex flex-col flex-1">
+                        {plan.descripcion && (
+                          <p className="text-sm text-gray-600 mb-4">{plan.descripcion}</p>
+                        )}
+
+                        <div className="mb-2">
+                          <span className="text-sm font-medium text-gray-600">Propiedades:</span>
+                          <span className="ml-2 text-sm font-semibold text-gray-900">
+                            Hasta {plan.limite_propiedades}
+                          </span>
+                        </div>
+
+                        {caracteristicas.length > 0 && (
+                          <ul className="space-y-3 mb-6">
+                            {caracteristicas.map((caracteristica, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                <span className="text-sm text-gray-700">
+                                  {caracteristica}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        <div className="mt-auto pt-4">
+                          <Button
+                            onClick={() => handleSelectPlan(plan.id)}
+                            className={`w-full ${
+                              plan.destacado
+                                ? "bg-primary hover:bg-primary/90 text-white"
+                                : "bg-white text-gray-800 border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm"
+                            }`}
+                            variant={plan.destacado ? "default" : "outline"}
+                            size="lg"
+                          >
+                            Continuar
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Opción sin plan */}
             <div className="text-center">

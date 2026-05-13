@@ -415,9 +415,40 @@ class ApiService {
 
     return this.handleResponse(response)
   }
+
+  // === PLANES DE SUSCRIPCIÓN ===
+
+  // Obtener planes activos (público - no requiere autenticación)
+  async getPlanes(): Promise<{ planes: Plan[] }> {
+    const response = await fetch(`${getApiUrl()}/api/planes`)
+
+    return this.handleResponse(response)
+  }
+
+  // Obtener un plan por ID (público)
+  async getPlan(id: number): Promise<Plan> {
+    const response = await fetch(`${getApiUrl()}/api/planes/${id}`)
+
+    return this.handleResponse(response)
+  }
+}
+
+// Interface para planes de suscripción
+interface Plan {
+  id: number
+  nombre: string
+  precio: number
+  descripcion: string
+  duracion_meses: number
+  limite_propiedades: number
+  caracteristicas: string
+  destacado: boolean
+  activo: boolean
+  orden: number
 }
 
 export const apiService = new ApiService()
 // Exportar como 'api' para compatibilidad con componentes existentes
 export const api = apiService
-export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property }
+export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan }
+
