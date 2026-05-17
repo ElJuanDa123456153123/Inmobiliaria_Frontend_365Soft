@@ -68,6 +68,8 @@ export interface AdminProperty {
   vendedor_email?: string
   vendedor_telefono?: string
   mostrar_vendedor: boolean
+  mostrar_agencia: boolean
+  agencia_nombre_personalizado?: string | null
 }
 
 export interface PropertyImage {
@@ -174,6 +176,8 @@ export interface UpdatePropertyRequest {
   terminos_condiciones?: string
   advisor_id?: number
   mostrar_vendedor?: boolean
+  mostrar_agencia?: boolean
+  agencia_nombre_personalizado?: string | null
 }
 
 export interface CreateAdvisorRequest {

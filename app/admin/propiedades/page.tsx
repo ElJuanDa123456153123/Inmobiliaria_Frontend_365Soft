@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Building, CheckCircle, Clock, TrendingUp, Trash2, Edit, Eye, Star, Shield, ShieldCheck, MoreHorizontal, UserCog, X, CheckSquare, Square, User, Plus, Mail } from "lucide-react"
+import { Search, Building, Building2, CheckCircle, Clock, TrendingUp, Trash2, Edit, Eye, Star, Shield, ShieldCheck, MoreHorizontal, UserCog, X, CheckSquare, Square, User, Plus, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -45,6 +45,33 @@ export default function AdminPropertiesPage() {
 
   // Estados para selección en lote
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<number[]>([])
+  const [agenciaPersonalizado, setAgenciaPersonalizado] = useState<string>("")
+
+  // Funciones helper para manejo de agencia
+  const getAgenciaSelectValue = (property: AdminProperty) => {
+    if (!property.mostrar_agencia) return "365soft"
+    if (property.agencia_nombre_personalizado) return "personalizado"
+    return "vendedor"
+  }
+
+  const getAgenciaDisplayValue = (property: AdminProperty) => {
+    if (!property.mostrar_agencia) return "365Soft"
+    if (property.agencia_nombre_personalizado) return property.agencia_nombre_personalizado
+    return property.vendedor_nombre
+  }
+
+  const handleAgenciaChange = (id: number, value: string) => {
+    if (value === "365soft") {
+      toggleMostrarAgencia(id, false)
+      setAgenciaPersonalizado("")
+    } else if (value === "vendedor") {
+      toggleMostrarAgencia(id, true, null)
+      setAgenciaPersonalizado("")
+    } else if (value === "personalizado") {
+      toggleMostrarAgencia(id, true, "")
+      setAgenciaPersonalizado(selectedProperty?.agencia_nombre_personalizado || "")
+    }
+  }
 
   useEffect(() => {
     fetchProperties()
@@ -129,7 +156,9 @@ export default function AdminPropertiesPage() {
 
   const toggleMostrarVendedor = async (id: number, mostrar: boolean) => {
     try {
+      console.log("🔄 [TOGGLE VENDEDOR] Enviando actualización:", { id, mostrar_vendedor: mostrar })
       await adminApi.updateProperty(id, { mostrar_vendedor: mostrar })
+      console.log("✅ [TOGGLE VENDEDOR] Actualización exitosa")
       toast.success(mostrar ? "Vendedor visible" : "Vendedor oculto (365Soft)")
 
       // Actualizar el estado local inmediatamente
@@ -148,9 +177,48 @@ export default function AdminPropertiesPage() {
       )
 
       // Recargar del backend para asegurar sincronización
-      fetchProperties()
+      await fetchProperties()
     } catch (error: any) {
+      console.error("❌ [TOGGLE VENDEDOR] Error:", error)
       toast.error(error.message || "Error al actualizar visibilidad")
+    }
+  }
+
+  const toggleMostrarAgencia = async (id: number, mostrar: boolean, nombrePersonalizado?: string | null) => {
+    try {
+      console.log("🔄 [TOGGLE AGENCIA] Enviando actualización:", { id, mostrar_agencia: mostrar, nombre_personalizado: nombrePersonalizado })
+      await adminApi.updateProperty(id, {
+        mostrar_agencia: mostrar,
+        ...(nombrePersonalizado !== undefined && { agencia_nombre_personalizado: nombrePersonalizado || null })
+      })
+      console.log("✅ [TOGGLE AGENCIA] Actualización exitosa")
+      toast.success(mostrar ? "Agencia visible" : "Agencia oculta (365Soft)")
+
+      // Actualizar el estado local inmediatamente
+      if (selectedProperty && selectedProperty.id === id) {
+        setSelectedProperty({
+          ...selectedProperty,
+          mostrar_agencia: mostrar,
+          ...(nombrePersonalizado !== undefined && { agencia_nombre_personalizado: nombrePersonalizado || null })
+        })
+      }
+
+      // Actualizar también el array de propiedades localmente para cambios inmediatos
+      setProperties(prevProperties =>
+        prevProperties.map(p =>
+          p.id === id ? {
+            ...p,
+            mostrar_agencia: mostrar,
+            ...(nombrePersonalizado !== undefined && { agencia_nombre_personalizado: nombrePersonalizado || null })
+          } : p
+        )
+      )
+
+      // Recargar del backend para asegurar sincronización
+      await fetchProperties()
+    } catch (error: any) {
+      console.error("❌ [TOGGLE AGENCIA] Error:", error)
+      toast.error(error.message || "Error al actualizar visibilidad de agencia")
     }
   }
 
@@ -649,40 +717,83 @@ export default function AdminPropertiesPage() {
                     <User className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-semibold text-sm text-muted-foreground">Publicado por</h3>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-medium ${
-                          selectedProperty.mostrar_vendedor ? 'text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full' : 'text-muted-foreground bg-muted px-2 py-1 rounded-full'
-                        }`}>
-                          {selectedProperty.mostrar_vendedor ? '✓ Visible' : '✕ No visible'}
-                        </span>
-                        <button
-                          onClick={() => toggleMostrarVendedor(selectedProperty.id, !selectedProperty.mostrar_vendedor)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            selectedProperty.mostrar_vendedor ? 'bg-primary' : 'bg-muted'
-                          }`}
-                          title={selectedProperty.mostrar_vendedor ? 'Click para ocultar vendedor (mostrar 365Soft)' : 'Click para mostrar vendedor real'}
-                        >
-                          <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                              selectedProperty.mostrar_vendedor ? 'translate-x-6' : 'translate-x-0.5'
-                            }`}
-                          />
-                        </button>
-                      </div>
+                    <div className="mb-2">
+                      <h3 className="font-semibold text-sm text-muted-foreground mb-1">Agente visible en el card</h3>
+                      <Select
+                        value={selectedProperty.mostrar_vendedor && assignedAdvisors.length > 0 ? "asesor" : "365soft"}
+                        onValueChange={(value) => toggleMostrarVendedor(selectedProperty.id, value === "asesor")}
+                      >
+                        <SelectTrigger className="text-xs h-9">
+                          <SelectValue placeholder="Selecciona..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="365soft">365Soft (por defecto)</SelectItem>
+                          {assignedAdvisors.length > 0 && (
+                            <SelectItem value="asesor">
+                              Asesor asignado: {assignedAdvisors[0]?.nombre || 'N/A'}
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {assignedAdvisors.length === 0
+                          ? "No hay asesores asignados. Se mostrará 365Soft."
+                          : "Selecciona si mostrar el asesor o 365Soft"
+                        }
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <p className="font-medium truncate">
-                        {selectedProperty.mostrar_vendedor ? selectedProperty.vendedor_nombre : '365Soft'}
+                        {selectedProperty.mostrar_vendedor && assignedAdvisors.length > 0
+                          ? assignedAdvisors[0]?.nombre
+                          : '365Soft'
+                        }
                       </p>
-                      {!selectedProperty.mostrar_vendedor && (
-                        <p className="text-xs text-muted-foreground">Mostrando 365Soft en lugar del vendedor real</p>
-                      )}
-                      {selectedProperty.mostrar_vendedor && selectedProperty.user && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Mail className="h-3 w-3" />
-                          <span className="truncate">{selectedProperty.user.email}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selector para mostrar/ocultar agencia */}
+                <div className="flex items-start gap-3 pt-2 border-t border-border">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Building2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="mb-2">
+                      <h3 className="font-semibold text-sm text-muted-foreground mb-1">Agencia visible en el card</h3>
+                      <Select
+                        value={getAgenciaSelectValue(selectedProperty)}
+                        onValueChange={(value) => handleAgenciaChange(selectedProperty.id, value)}
+                      >
+                        <SelectTrigger className="text-xs h-9">
+                          <SelectValue placeholder="Selecciona..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="365soft">365Soft (por defecto)</SelectItem>
+                          <SelectItem value="vendedor">Vendedor: {selectedProperty.vendedor_nombre}</SelectItem>
+                          <SelectItem value="personalizado">Personalizado...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-medium truncate">
+                        {getAgenciaDisplayValue(selectedProperty)}
+                      </p>
+                      {agenciaPersonalizado && (
+                        <div className="mt-2 space-y-2">
+                          <Input
+                            placeholder="Escribe nombre personalizado"
+                            value={agenciaPersonalizado}
+                            onChange={(e) => setAgenciaPersonalizado(e.target.value)}
+                            onBlur={(e) => {
+                              const valor = e.target.value.trim()
+                              toggleMostrarAgencia(selectedProperty.id, true, valor)
+                            }}
+                            className="text-xs h-8"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Presiona Enter o haz clic fuera para guardar
+                          </p>
                         </div>
                       )}
                     </div>
