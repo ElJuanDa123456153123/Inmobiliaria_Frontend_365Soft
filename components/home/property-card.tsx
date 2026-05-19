@@ -7,6 +7,7 @@ import { MapPin, Bed, Bath, Maximize, Calendar, MessageCircle, Phone, Star, Chev
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { FavoriteButton } from "@/components/ui/favorite-button"
 
 interface PropertyCardProps {
   id: string
@@ -105,10 +106,13 @@ export function PropertyCard({
           </div>
         )}
 
-        {/* Operation Type Badge */}
-        <div className="absolute top-4 right-4 bg-white/90 dark:bg-gray-900/90 px-3 py-1 rounded-full text-sm font-medium">
-          <span className={cn("inline-block w-2 h-2 rounded-full mr-1", operationColors[operationType])}></span>
-          {operationType.charAt(0).toUpperCase() + operationType.slice(1)}
+        {/* Operation Type & Favorite Button */}
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-10">
+          <FavoriteButton propertyId={parseInt(id)} className="bg-white/90 hover:bg-white dark:bg-gray-900/90" />
+          <div className="bg-white/90 dark:bg-gray-900/90 px-3 py-1 rounded-full text-sm font-medium">
+            <span className={cn("inline-block w-2 h-2 rounded-full mr-1", operationColors[operationType])}></span>
+            {operationType.charAt(0).toUpperCase() + operationType.slice(1)}
+          </div>
         </div>
 
         {/* Image Counter */}

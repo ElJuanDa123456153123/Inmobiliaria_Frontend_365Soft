@@ -28,6 +28,7 @@ import { apiService, Property } from "@/lib/services/api"
 import { toast } from "sonner"
 import { getImageUrl } from "@/lib/utils"
 import dynamic from "next/dynamic"
+import { FavoriteButton } from "@/components/ui/favorite-button"
 
 // Cargar el mapa de forma dinámica para evitar problemas de SSR
 const Mapa = dynamic(() => import("@/components/mapa/Mapa"), {
@@ -41,7 +42,6 @@ export default function PropertyDetailPage() {
   const [property, setProperty] = useState<Property | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [isFavorite, setIsFavorite] = useState(false)
 
   // Cargar propiedad desde el backend
   useEffect(() => {
@@ -180,14 +180,7 @@ export default function PropertyDetailPage() {
 
               {/* Actions */}
               <div className="absolute top-4 right-4 flex gap-2">
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  onClick={() => setIsFavorite(!isFavorite)}
-                  className="rounded-full"
-                >
-                  <Heart className={`h-5 w-5 ${isFavorite ? "fill-red-500 text-red-500" : ""}`} />
-                </Button>
+                <FavoriteButton propertyId={property.id} className="rounded-full" />
                 <Button size="icon" variant="secondary" className="rounded-full">
                   <Share2 className="h-5 w-5" />
                 </Button>

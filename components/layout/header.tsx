@@ -182,7 +182,7 @@ export function Header() {
                       Perfil
                     </Link>
                     <Link
-                      href="/favoritos"
+                      href="/mis-favoritos"
                       className="flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                       onClick={() => setUserMenuOpen(false)}
                     >
@@ -334,7 +334,7 @@ export function Header() {
                     </Link>
                   </Button>
                   <Button variant="ghost" asChild className="w-full justify-start">
-                    <Link href="/favoritos" onClick={() => setMobileMenuOpen(false)}>
+                    <Link href="/mis-favoritos" onClick={() => setMobileMenuOpen(false)}>
                       <Heart className="h-4 w-4 mr-2" />
                       Favoritos
                     </Link>

@@ -416,6 +416,38 @@ class ApiService {
     return this.handleResponse(response)
   }
 
+  // === FAVORITOS ===
+  async addFavorite(propertyId: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/favorites`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ property_id: propertyId }),
+    })
+    return this.handleResponse(response)
+  }
+
+  async removeFavorite(propertyId: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/favorites/${propertyId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async getFavorites(): Promise<{ favorites: { id: number, property_id: number, property: Property }[] }> {
+    const response = await fetch(`${getApiUrl()}/api/favorites`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async checkFavorite(propertyId: number): Promise<{ isFavorite: boolean }> {
+    const response = await fetch(`${getApiUrl()}/api/favorites/check/${propertyId}`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
   // === PLANES DE SUSCRIPCIÓN ===
 
   // Obtener planes activos (público - no requiere autenticación)
