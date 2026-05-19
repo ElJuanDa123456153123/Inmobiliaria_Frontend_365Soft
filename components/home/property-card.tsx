@@ -24,6 +24,8 @@ interface PropertyCardProps {
   description?: string
   agentName?: string
   agencyName?: string
+  agentAvatar?: string | null
+  agentPhone?: string
   images?: string[]
   currentImageIndex?: number
 }
@@ -49,8 +51,20 @@ export function PropertyCard({
   description,
   agentName,
   agencyName,
+  agentAvatar,
+  agentPhone,
   images = [],
 }: PropertyCardProps) {
+  // Debug: Ver qué props recibe el card
+  console.log("🎴 [PROPERTY CARD] Props recibidas:", {
+    id,
+    agentName,
+    agencyName,
+    agentAvatar,
+    agentPhone,
+    title
+  })
+
   // Estado para el índice de la imagen actual
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
@@ -229,7 +243,21 @@ export function PropertyCard({
         {/* Agent Info - más compacto */}
         <div className="flex items-center gap-2 mb-4 pb-3 border-b">
           <div className="relative">
-            <div className="bg-muted rounded-full flex items-center justify-center" style={{ width: '32px', height: '32px' }}>
+            {agentAvatar ? (
+              <img
+                src={agentAvatar}
+                alt={agentName || "Agente"}
+                className="rounded-full object-cover border-2 border-border"
+                style={{ width: '32px', height: '32px' }}
+                onError={(e) => {
+                  // Si falla la carga, ocultar imagen y mostrar icono
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  target.nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+            ) : null}
+            <div className={`bg-muted rounded-full flex items-center justify-center ${agentAvatar ? 'hidden' : ''}`} style={{ width: '32px', height: '32px' }}>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="absolute -bottom-0.5 -right-0.5 bg-[#FF6B00] rounded-full flex items-center justify-center border-2 border-background" style={{ width: '14px', height: '14px' }}>
@@ -252,7 +280,7 @@ export function PropertyCard({
             </Link>
           </Button>
           <Button variant="outline" className="text-xs gap-1" asChild>
-            <a href={`tel:${agentName || ''}`}>
+            <a href={`tel:${agentPhone || ''}`}>
               <Phone className="h-3 w-3" />
             </a>
           </Button>

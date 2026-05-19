@@ -61,6 +61,16 @@ export function FeaturedProperties() {
 
   // Convertir propiedad del backend al formato que espera PropertyCard
   const formatProperty = (property: Property) => {
+    // Debug: Ver qué datos llegan
+    console.log("📦 [FORMAT PROPERTY] Datos recibidos:", {
+      id: property.id,
+      titulo: property.titulo,
+      mostrar_vendedor: property.mostrar_vendedor,
+      mostrar_agencia: property.mostrar_agencia,
+      num_asesores: property.asesores_asignados?.length || 0,
+      primer_asesor: property.asesores_asignados?.[0]?.asesor
+    })
+
     // Obtener todas las imágenes usando getImageUrl para normalización correcta
     const allImages = property.imagenes && property.imagenes.length > 0
       ? property.imagenes
@@ -77,14 +87,43 @@ export function FeaturedProperties() {
       ? (getImageUrl(mainImage.image_url) || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop")
       : "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop"
 
-    // Determinar si mostrar vendedor real o 365Soft
-    const mostrarVendedor = property.mostrar_vendedor !== false; // Por defecto true
-    const nombreVendedor = mostrarVendedor
-      ? (property.vendedor_contacto || property.vendedor_nombre)
+    // Determinar si mostrar vendedor real o 365Soft (ahora default es false = 365Soft)
+    const mostrarVendedor = property.mostrar_vendedor === true;
+    const mostrarAgencia = property.mostrar_agencia === true;
+
+    // Prioridad: Asesor asignado > Vendedor real > 365Soft
+    const primerAsesor = property.asesores_asignados && property.asesores_asignados.length > 0
+      ? property.asesores_asignados[0].asesor
+      : null;
+
+    // Lógica del Agente: Toggle ON + Asesor → Asesor, Toggle OFF o Sin Asesor → 365Soft
+    let nombreVendedor = '365Soft';
+    let avatarUrl = null;
+    let telefonoContacto = '';
+
+    if (mostrarVendedor && primerAsesor) {
+      // Solo mostrar asesor si el toggle está ON Y hay asesor asignado
+      nombreVendedor = primerAsesor.nombre;
+      avatarUrl = primerAsesor.avatar_url || primerAsesor.imagen_url
+        ? (getImageUrl(primerAsesor.avatar_url || primerAsesor.imagen_url) || null)
+        : null;
+      telefonoContacto = primerAsesor.telefono || '';
+    }
+    // Si no hay asesor o toggle está OFF, se mantiene 365Soft
+
+    const nombreAgencia = mostrarAgencia
+      ? (property.agencia_nombre_personalizado || property.vendedor_nombre)
       : '365Soft';
-    const nombreAgencia = mostrarVendedor
-      ? property.vendedor_nombre
-      : '365Soft';
+
+    console.log("✅ [FORMAT PROPERTY] Valores calculados:", {
+      id: property.id,
+      nombreVendedor,
+      nombreAgencia,
+      avatarUrl,
+      telefonoContacto,
+      tieneAsesor: !!primerAsesor,
+      nombreAsesor: primerAsesor?.nombre
+    })
 
     return {
       id: property.id.toString(),
@@ -101,6 +140,8 @@ export function FeaturedProperties() {
       description: property.descripcion,
       agentName: nombreVendedor,
       agencyName: nombreAgencia,
+      agentAvatar: avatarUrl,
+      agentPhone: telefonoContacto,
       images: allImages,
     }
   }

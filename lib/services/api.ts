@@ -146,7 +146,9 @@ interface Property {
   vendedor_telefono?: string
   vendedor_contacto?: string
   vendedor_horario?: string
-  mostrar_vendedor?: boolean // Toggle para mostrar/ocultar vendedor
+  mostrar_vendedor?: boolean // Toggle para mostrar/ocultar vendedor (default: false = 365Soft)
+  mostrar_agencia?: boolean // Toggle para mostrar/ocultar agencia (default: false = 365Soft)
+  agencia_nombre_personalizado?: string // Nombre personalizado para la agencia
   // Imágenes de la propiedad
   imagenes?: Array<{
     id: number

@@ -72,6 +72,35 @@ export async function FeaturedPropertiesServer() {
 
   // Convertir propiedad del backend al formato que espera PropertyCard
   const formatProperty = (property: any) => {
+    // Toggle "Agente": false = 365Soft, true = Asesor (si hay) o 365Soft (si no)
+    const mostrarAgente = property.mostrar_vendedor === true;
+    const mostrarAgencia = property.mostrar_agencia === true;
+
+    // Buscar asesor asignado
+    const primerAsesor = property.asesores_asignados && property.asesores_asignados.length > 0
+      ? property.asesores_asignados[0].asesor
+      : null;
+
+    // Lógica del Agente: Toggle ON + Asesor → Asesor, Toggle OFF o Sin Asesor → 365Soft
+    let nombreVendedor = '365Soft';
+    let avatarUrl = null;
+    let telefonoContacto = '';
+
+    if (mostrarAgente && primerAsesor) {
+      // Solo mostrar asesor si el toggle está ON Y hay asesor asignado
+      nombreVendedor = primerAsesor.nombre;
+      avatarUrl = primerAsesor.avatar_url || primerAsesor.imagen_url
+        ? (getImageUrl(primerAsesor.avatar_url || primerAsesor.imagen_url) || null)
+        : null;
+      telefonoContacto = primerAsesor.telefono || '';
+    }
+    // Si no hay asesor o toggle está OFF, se mantiene 365Soft
+
+    // Nombre de agencia: Personalizado > Vendedor real > 365Soft
+    const nombreAgencia = mostrarAgencia
+      ? (property.agencia_nombre_personalizado || property.vendedor_nombre)
+      : '365Soft';
+
     // Obtener todas las imágenes usando getImageUrl
     const allImages = property.imagenes && property.imagenes.length > 0
       ? property.imagenes
@@ -100,8 +129,10 @@ export async function FeaturedPropertiesServer() {
       image: imageUrl,
       featured: property.destacado,
       description: property.descripcion,
-      agentName: property.vendedor_contacto || property.vendedor_nombre,
-      agencyName: property.vendedor_nombre,
+      agentName: nombreVendedor,
+      agencyName: nombreAgencia,
+      agentAvatar: avatarUrl,
+      agentPhone: telefonoContacto,
       images: allImages,
     }
   }
