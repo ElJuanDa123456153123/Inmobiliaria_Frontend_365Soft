@@ -37,6 +37,8 @@ export default function PerfilPage() {
   const [activeTab, setActiveTab] = useState<TabType>('resumen')
   const [properties, setProperties] = useState<Property[]>([])
   const [loadingProperties, setLoadingProperties] = useState(true)
+  const [favorites, setFavorites] = useState<{ id: number, property_id: number, property: Property }[]>([])
+  const [loadingFavorites, setLoadingFavorites] = useState(true)
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -123,6 +125,34 @@ export default function PerfilPage() {
     }
 
     fetchProperties()
+  }, [])
+
+  // Cargar propiedades favoritas del usuario
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      const token = localStorage.getItem("token")
+      if (!token) return
+
+      try {
+        setLoadingFavorites(true)
+        const res = await apiService.getFavorites()
+        // Filtrar elementos que no tengan una propiedad válida
+        const validFavorites = (res.favorites || []).filter(f => f.property)
+        setFavorites(validFavorites)
+      } catch (error) {
+        console.error('Error cargando favoritos:', error)
+      } finally {
+        setLoadingFavorites(false)
+      }
+    }
+
+    fetchFavorites()
+
+    // Escuchar el evento de favoritos actualizados para recargar la lista
+    window.addEventListener("favorites-updated", fetchFavorites)
+    return () => {
+      window.removeEventListener("favorites-updated", fetchFavorites)
+    }
   }, [])
 
   const handleLogout = () => {
@@ -666,13 +696,127 @@ export default function PerfilPage() {
 
               {activeTab === 'favoritos' && (
                 <Card>
-                  <CardContent className="p-12 text-center">
-                    <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Mis Favoritos</h3>
-                    <p className="text-muted-foreground mb-4">Aún no tienes propiedades favoritas</p>
-                    <Button onClick={() => router.push('/')}>
-                      Explorar propiedades
-                    </Button>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                      Mis Favoritos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingFavorites ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      </div>
+                    ) : favorites.length > 0 ? (
+                      <div className="space-y-3">
+                        {favorites.map((fav) => {
+                          const property = fav.property
+                          if (!property) return null
+
+                          // Obtener la imagen principal
+                          const mainImage = property.imagenes && property.imagenes.length > 0
+                            ? property.imagenes.find(img => img.principal) || property.imagenes[0]
+                            : null
+
+                          // Formatear precio
+                          const moneda = property.moneda === 'BOB' ? 'Bs' : '$'
+                          let precioFormateado = `${moneda} ${property.precio.toLocaleString()}`
+                          if (property.tipo_operacion === 'alquiler') {
+                            precioFormateado += '/mes'
+                          } else if (property.tipo_operacion === 'anticretico') {
+                            precioFormateado += ' Anticrético'
+                          }
+
+                          return (
+                            <div key={property.id} className="relative group">
+                              <button
+                                onClick={() => router.push(`/propiedades/${property.id}`)}
+                                className="w-full text-left"
+                              >
+                                <Card className="transition-all hover:shadow-md hover:border-primary/50">
+                                  <CardContent className="p-4">
+                                    <div className="flex gap-4">
+                                      {/* Imagen */}
+                                      <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200">
+                                        {mainImage ? (
+                                          <img
+                                            src={getImageUrl(mainImage.image_url) || ''}
+                                            alt={property.titulo}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center bg-gray-300">
+                                            <ImageIcon className="w-8 h-8 text-gray-400" />
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Información */}
+                                      <div className="flex-1 min-w-0 pr-8">
+                                        <h4 className="font-semibold text-gray-900 group-hover:text-primary transition-colors mb-1 truncate">
+                                          {property.titulo}
+                                        </h4>
+                                        <div className="flex items-center gap-1 text-sm text-gray-600 mb-2">
+                                          <MapPin className="w-4 h-4 flex-shrink-0" />
+                                          <span className="truncate">{property.zona}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-lg font-bold text-primary">
+                                            {precioFormateado}
+                                          </span>
+                                          <span className={`text-xs px-2 py-1 rounded-full ${
+                                            property.estado_propiedad === 'activo'
+                                              ? 'bg-green-100 text-green-800'
+                                              : property.estado_propiedad === 'vendido'
+                                              ? 'bg-blue-100 text-blue-800'
+                                              : property.estado_propiedad === 'inactivo'
+                                              ? 'bg-gray-100 text-gray-800'
+                                              : 'bg-yellow-100 text-yellow-800'
+                                          }`}>
+                                            {property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </button>
+                              
+                              {/* Botón para quitar de favoritos */}
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  e.preventDefault()
+                                  try {
+                                    await apiService.removeFavorite(property.id)
+                                    setFavorites(prev => prev.filter(f => f.property_id !== property.id))
+                                    toast.success("Eliminado de favoritos")
+                                    // Disparar evento para que otros componentes se enteren
+                                    window.dispatchEvent(new Event("favorites-updated"))
+                                  } catch (error) {
+                                    console.error("Error al eliminar de favoritos:", error)
+                                    toast.error("No se pudo eliminar de favoritos")
+                                  }
+                                }}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-red-50 text-red-500 hover:text-red-600 transition-colors z-10"
+                                title="Quitar de favoritos"
+                              >
+                                <Heart className="w-5 h-5 fill-red-500" />
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <Heart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-500 mb-1">Aún no tienes propiedades favoritas</p>
+                        <p className="text-sm text-gray-400 mb-4">Explora nuestras propiedades y guarda las que más te gusten</p>
+                        <Button onClick={() => router.push('/')}>
+                          Explorar propiedades
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
