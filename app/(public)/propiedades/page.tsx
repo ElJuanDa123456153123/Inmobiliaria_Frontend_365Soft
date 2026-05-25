@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect, useMemo, Suspense } from "react"
-import { Search, SlidersHorizontal, MapPin, ChevronLeft, ChevronRight, Loader2, Map as MapIcon, List as ListIcon, Columns } from "lucide-react"
+import { Search, SlidersHorizontal, MapPin, ChevronLeft, ChevronRight, Loader2, Map as MapIcon, List as ListIcon, Columns, Bell } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { SaveSearchModal } from "@/components/ui/save-search-modal"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -83,6 +84,7 @@ function PropiedadesContent() {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || "")
   const [useFullTextSearch, setUseFullTextSearch] = useState(!!searchParams.get('search'))
   const [showFilters, setShowFilters] = useState(false)
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   const [filters, setFilters] = useState({
@@ -373,6 +375,22 @@ function PropiedadesContent() {
                 <SlidersHorizontal className="h-4 w-4" />
               </Button>
 
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const token = localStorage.getItem("token")
+                  if (!token) {
+                    alert("Debes iniciar sesión para poder guardar búsquedas.")
+                    return
+                  }
+                  setIsSaveModalOpen(true)
+                }}
+                className="h-10 border-primary text-primary hover:bg-primary/5 flex items-center gap-2 px-3"
+              >
+                <Bell className="h-4 w-4 text-primary" />
+                <span className="hidden sm:inline font-semibold">Guardar búsqueda</span>
+              </Button>
+
               <div className="flex-1" />
 
               {/* View Mode Toggle */}
@@ -613,6 +631,13 @@ function PropiedadesContent() {
           )}
         </Button>
       </div>
+
+      <SaveSearchModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        filters={filters}
+        searchTerm={searchTerm}
+      />
     </div>
   )
 }

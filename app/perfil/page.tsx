@@ -16,13 +16,17 @@ import {
   Edit,
   MapPin,
   Image as ImageIcon,
+  Bell,
+  BellOff,
+  Trash2,
+  Eye,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { apiService, UserProfile, Property } from "@/lib/services/api"
+import { apiService, UserProfile, Property, SavedSearch } from "@/lib/services/api"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { getImageUrl } from "@/lib/utils"
@@ -39,6 +43,8 @@ export default function PerfilPage() {
   const [loadingProperties, setLoadingProperties] = useState(true)
   const [favorites, setFavorites] = useState<{ id: number, property_id: number, property: Property }[]>([])
   const [loadingFavorites, setLoadingFavorites] = useState(true)
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
+  const [loadingSearches, setLoadingSearches] = useState(true)
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -155,6 +161,31 @@ export default function PerfilPage() {
     }
   }, [])
 
+  // Cargar búsquedas guardadas del usuario
+  const fetchSavedSearches = async () => {
+    const token = localStorage.getItem("token")
+    if (!token) return
+
+    try {
+      setLoadingSearches(true)
+      const res = await apiService.getSavedSearches()
+      setSavedSearches(res.searches || [])
+    } catch (error) {
+      console.error('Error cargando búsquedas guardadas:', error)
+    } finally {
+      setLoadingSearches(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSavedSearches()
+
+    window.addEventListener("saved-searches-updated", fetchSavedSearches)
+    return () => {
+      window.removeEventListener("saved-searches-updated", fetchSavedSearches)
+    }
+  }, [])
+
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("userName")
@@ -239,6 +270,51 @@ export default function PerfilPage() {
     { id: 'historial' as TabType, label: 'Historial', icon: Clock },
     { id: 'consultas' as TabType, label: 'Consultas', icon: MessageCircle },
   ]
+
+  const getFilterChips = (filtros: any) => {
+    if (!filtros) return []
+    const chips: string[] = []
+    
+    const operation = filtros.tipo_operacion || filtros.operation
+    if (operation && operation !== 'todas') {
+      chips.push(`Operación: ${operation}`)
+    }
+    
+    const type = filtros.tipo_propiedad || filtros.type
+    if (type && type !== 'todas') {
+      chips.push(`Tipo: ${type}`)
+    }
+    
+    const zona = filtros.zona || filtros.search
+    if (zona) {
+      chips.push(`Zona: ${zona}`)
+    }
+    
+    const priceMin = filtros.precio_min || filtros.priceMin
+    const priceMax = filtros.precio_max || filtros.priceMax
+    const moneda = filtros.moneda !== 'todas' ? (filtros.moneda === 'BOB' ? 'Bs' : 'USD') : ''
+    if (priceMin || priceMax) {
+      if (priceMin && priceMax) {
+        chips.push(`Precio: ${priceMin} - ${priceMax} ${moneda}`)
+      } else if (priceMin) {
+        chips.push(`Precio Mín: >= ${priceMin} ${moneda}`)
+      } else if (priceMax) {
+        chips.push(`Precio Máx: <= ${priceMax} ${moneda}`)
+      }
+    }
+    
+    const bedrooms = filtros.dormitorios || filtros.bedrooms
+    if (bedrooms && bedrooms !== 'todas') {
+      chips.push(`Dormitorios: ${bedrooms}`)
+    }
+    
+    const bathrooms = filtros.banos || filtros.bathrooms
+    if (bathrooms && bathrooms !== 'todas') {
+      chips.push(`Baños: ${bathrooms}`)
+    }
+
+    return chips
+  }
 
   if (loading) {
     return (
@@ -683,13 +759,162 @@ export default function PerfilPage() {
                 </Card>
               )}
 
-              {/* Otras tabs (vacías por ahora) */}
+              {/* Otras tabs */}
               {activeTab === 'busquedas' && (
                 <Card>
-                  <CardContent className="p-12 text-center">
-                    <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Mis Búsquedas</h3>
-                    <p className="text-muted-foreground mb-4">Guarda tus búsquedas favoritas para recibir alertas</p>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Search className="w-5 h-5 text-primary" />
+                      Mis Búsquedas Guardadas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingSearches ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      </div>
+                    ) : savedSearches.length > 0 ? (
+                      <div className="space-y-4">
+                        {savedSearches.map((search) => {
+                          const chips = getFilterChips(search.filtros)
+                          const matchesCount = search.matches_count !== undefined ? search.matches_count : 0
+
+                          return (
+                            <div
+                              key={search.id}
+                              className="p-4 border rounded-xl hover:shadow-md transition-all bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                            >
+                              <div className="space-y-2 flex-1">
+                                <div className="flex items-center gap-3">
+                                  <h4 className="font-bold text-gray-900 text-base">{search.nombre}</h4>
+                                  <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${search.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                    {search.is_active ? 'Alertas activas' : 'Alertas pausadas'}
+                                  </span>
+                                </div>
+
+                                {/* Chips de filtros */}
+                                <div className="flex flex-wrap gap-1.5">
+                                  {chips.map((chip, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-block text-[11px] font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full border border-border"
+                                    >
+                                      {chip}
+                                    </span>
+                                  ))}
+                                  {chips.length === 0 && (
+                                    <span className="text-xs text-muted-foreground italic">Sin filtros específicos</span>
+                                  )}
+                                </div>
+
+                                <p className="text-xs text-muted-foreground">
+                                  Guardado el: {new Date(search.created_at).toLocaleDateString('es-BO')}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
+                                {/* Contador de coincidencias */}
+                                <div className="text-center sm:text-right md:text-center lg:text-right px-3 py-1.5 bg-primary/5 rounded-lg border border-primary/10 mr-0 sm:mr-2">
+                                  <span className="block text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Coincidencias</span>
+                                  <span className="text-sm font-bold text-primary">{matchesCount} {matchesCount === 1 ? 'inmueble' : 'inmuebles'}</span>
+                                </div>
+
+                                {/* Botón Ver Coincidencias */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const params = new URLSearchParams()
+                                    const filters = search.filtros
+                                    if (filters) {
+                                      const operation = filters.tipo_operacion || filters.operation
+                                      if (operation && operation !== 'todas') params.append('operation', operation)
+                                      
+                                      const type = filters.tipo_propiedad || filters.type
+                                      if (type && type !== 'todas') params.append('type', type)
+                                      
+                                      const searchVal = filters.zona || filters.search
+                                      if (searchVal) params.append('search', searchVal)
+                                      
+                                      const priceMin = filters.precio_min || filters.priceMin
+                                      if (priceMin) params.append('priceMin', String(priceMin))
+                                      
+                                      const priceMax = filters.precio_max || filters.priceMax
+                                      if (priceMax) params.append('priceMax', String(priceMax))
+                                      
+                                      const bedrooms = filters.dormitorios || filters.bedrooms
+                                      if (bedrooms && bedrooms !== 'todas') params.append('bedrooms', String(bedrooms))
+                                    }
+                                    router.push(`/propiedades?${params.toString()}`)
+                                  }}
+                                  className="flex items-center gap-1 text-xs"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  Ver coincidencias
+                                </Button>
+
+                                {/* Botón Pausar/Activar */}
+                                <Button
+                                  variant={search.is_active ? "secondary" : "outline"}
+                                  size="sm"
+                                  onClick={async () => {
+                                    try {
+                                      const res = await apiService.toggleSavedSearch(search.id)
+                                      setSavedSearches(prev => prev.map(s => s.id === search.id ? { ...s, is_active: res.saved_search.is_active } : s))
+                                      toast.success(res.saved_search.is_active ? "Alertas activadas" : "Alertas pausadas")
+                                    } catch (err) {
+                                      toast.error("Error al cambiar estado de alertas")
+                                    }
+                                  }}
+                                  className="flex items-center gap-1 text-xs"
+                                >
+                                  {search.is_active ? (
+                                    <>
+                                      <BellOff className="w-3.5 h-3.5" />
+                                      Pausar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Bell className="w-3.5 h-3.5" />
+                                      Activar
+                                    </>
+                                  )}
+                                </Button>
+
+                                {/* Botón Eliminar */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    if (confirm("¿Estás seguro de que quieres eliminar esta búsqueda guardada?")) {
+                                      try {
+                                        await apiService.deleteSavedSearch(search.id)
+                                        setSavedSearches(prev => prev.filter(s => s.id !== search.id))
+                                        toast.success("Búsqueda eliminada correctamente")
+                                      } catch (err) {
+                                        toast.error("Error al eliminar la búsqueda")
+                                      }
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-500 mb-1">Aún no tienes búsquedas guardadas</p>
+                        <p className="text-sm text-gray-400 mb-4">Guarda tus búsquedas desde el buscador para recibir alertas al instante</p>
+                        <Button onClick={() => router.push('/propiedades')}>
+                          Ir al buscador
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

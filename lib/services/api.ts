@@ -465,6 +465,62 @@ class ApiService {
 
     return this.handleResponse(response)
   }
+
+  // === BÚSQUEDAS GUARDADAS Y NOTIFICACIONES ===
+
+  async saveSearch(nombre: string, filtros: any): Promise<{ message: string; saved_search: SavedSearch }> {
+    const response = await fetch(`${getApiUrl()}/api/saved-searches`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ nombre, filtros }),
+    })
+    return this.handleResponse(response)
+  }
+
+  async getSavedSearches(): Promise<{ searches: SavedSearch[] }> {
+    const response = await fetch(`${getApiUrl()}/api/saved-searches`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async deleteSavedSearch(id: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/saved-searches/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async toggleSavedSearch(id: number): Promise<{ message: string; saved_search: SavedSearch }> {
+    const response = await fetch(`${getApiUrl()}/api/saved-searches/${id}/toggle`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async getSavedSearchMatches(id: number): Promise<{ search: SavedSearch; properties: Property[] }> {
+    const response = await fetch(`${getApiUrl()}/api/saved-searches/${id}/matches`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async getNotifications(): Promise<{ notifications: Notification[]; unread_count: number }> {
+    const response = await fetch(`${getApiUrl()}/api/notifications`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async markNotificationsAsRead(): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/notifications/read`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
 }
 
 // Interface para planes de suscripción
@@ -481,8 +537,28 @@ interface Plan {
   orden: number
 }
 
+interface SavedSearch {
+  id: number
+  created_at: string
+  nombre: string
+  filtros: any
+  is_active: boolean
+  matches_count?: number
+}
+
+interface Notification {
+  id: number
+  created_at: string
+  saved_search_id?: number
+  saved_search?: SavedSearch
+  property_id: number
+  property: Property
+  mensaje: string
+  is_read: boolean
+}
+
 export const apiService = new ApiService()
 // Exportar como 'api' para compatibilidad con componentes existentes
 export const api = apiService
-export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan }
+export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan, SavedSearch, Notification }
 

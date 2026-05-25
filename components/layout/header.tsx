@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { Menu, X, User, Heart, LogOut, ChevronDown, Shield } from "lucide-react"
+import { Menu, X, User, Heart, LogOut, ChevronDown, Shield, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { apiService, type Notification } from "@/lib/services/api"
 
 export function Header() {
   const router = useRouter()
@@ -16,6 +17,11 @@ export function Header() {
   const [userName, setUserName] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isClient, setIsClient] = useState(false)
+
+  // Estados de notificaciones
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
 
   // Verificar si estamos en la página /publicar
   const isPublicarPage = pathname?.startsWith("/publicar")
@@ -93,6 +99,76 @@ export function Header() {
     }
   }, [publishMenuOpen])
 
+  // Buscar notificaciones
+  const fetchNotifications = async () => {
+    const token = localStorage.getItem("token")
+    if (!token) return
+    try {
+      const res = await apiService.getNotifications()
+      setNotifications(res.notifications || [])
+      setUnreadCount(res.unread_count || 0)
+    } catch (err) {
+      console.error("Error fetching notifications:", err)
+    }
+  }
+
+  // Marcar todas como leídas
+  const handleMarkAllRead = async () => {
+    try {
+      await apiService.markNotificationsAsRead()
+      setUnreadCount(0)
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+      // Notificar a otras pantallas
+      window.dispatchEvent(new Event("notifications-updated"))
+    } catch (err) {
+      console.error("Error marking notifications as read:", err)
+    }
+  }
+
+  // Al hacer clic en una notificación
+  const handleNotificationClick = async (notif: Notification) => {
+    setNotificationsOpen(false)
+    router.push(`/propiedades/${notif.property_id}`)
+  }
+
+  // Efecto para cargar notificaciones inicialmente y en intervalos
+  useEffect(() => {
+    if (userName) {
+      fetchNotifications()
+      // Verificar notificaciones cada 30 segundos
+      const interval = setInterval(fetchNotifications, 30000)
+      
+      const handleCustomUpdate = () => {
+        fetchNotifications()
+      }
+      window.addEventListener("notifications-updated", handleCustomUpdate)
+
+      return () => {
+        clearInterval(interval)
+        window.removeEventListener("notifications-updated", handleCustomUpdate)
+      }
+    } else {
+      setNotifications([])
+      setUnreadCount(0)
+    }
+  }, [userName])
+
+  // Cerrar el dropdown de notificaciones cuando se hace click fuera de él
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      const notificationsMenu = target.closest(".notifications-menu-container")
+      if (!notificationsMenu && notificationsOpen) {
+        setNotificationsOpen(false)
+      }
+    }
+
+    if (notificationsOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+      return () => document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [notificationsOpen])
+
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("userName")
@@ -158,6 +234,76 @@ export function Header() {
         <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
           {isClient && userName ? (
             <>
+              {/* Notificaciones */}
+              <div className="relative notifications-menu-container mr-2">
+                <button
+                  onClick={() => {
+                    setNotificationsOpen(!notificationsOpen)
+                    if (!notificationsOpen) {
+                      fetchNotifications()
+                    }
+                  }}
+                  className="relative p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors flex items-center justify-center"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-red-600 text-[9px] font-bold text-white animate-pulse px-1 border border-white">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {notificationsOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-border py-2 z-50 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                      <span className="font-bold text-sm">Notificaciones</span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-xs text-primary hover:underline font-semibold"
+                        >
+                          Marcar leídas
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="max-h-64 overflow-y-auto divide-y divide-border">
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-muted-foreground italic">
+                          No tienes notificaciones
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            onClick={() => handleNotificationClick(notif)}
+                            className={`p-3 text-xs cursor-pointer hover:bg-muted/50 transition-colors flex gap-3 items-start ${!notif.is_read ? 'bg-primary/5 font-medium border-l-2 border-primary' : ''}`}
+                          >
+                            <div className="w-10 h-10 rounded bg-muted/60 overflow-hidden shrink-0 border border-border">
+                              {notif.property?.imagenes && notif.property.imagenes.length > 0 ? (
+                                <img
+                                  src={notif.property.imagenes[0].image_url.startsWith('http') ? notif.property.imagenes[0].image_url : `http://localhost:3001${notif.property.imagenes[0].image_url}`}
+                                  className="w-full h-full object-cover"
+                                  alt="Inmueble"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary font-bold">365</div>
+                              )}
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-foreground leading-relaxed">{notif.mensaje}</p>
+                              <span className="text-[10px] text-muted-foreground block">
+                                {new Date(notif.created_at).toLocaleDateString('es-BO')} a las {new Date(notif.created_at).toLocaleTimeString('es-BO', {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Usuario logueado */}
               <div className="relative user-menu-container">
                 <button
