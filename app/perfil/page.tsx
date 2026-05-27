@@ -12,6 +12,7 @@ import {
   HelpCircle,
   Settings,
   ChevronRight,
+  ChevronLeft,
   Plus,
   Edit,
   MapPin,
@@ -26,7 +27,7 @@ import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { apiService, UserProfile, Property, SavedSearch } from "@/lib/services/api"
+import { apiService, UserProfile, Property, SavedSearch, ViewHistoryItem } from "@/lib/services/api"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { getImageUrl } from "@/lib/utils"
@@ -45,6 +46,11 @@ export default function PerfilPage() {
   const [loadingFavorites, setLoadingFavorites] = useState(true)
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
   const [loadingSearches, setLoadingSearches] = useState(true)
+  const [viewHistory, setViewHistory] = useState<ViewHistoryItem[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyTotalPages, setHistoryTotalPages] = useState(1)
+  const [historyTotal, setHistoryTotal] = useState(0)
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -185,6 +191,50 @@ export default function PerfilPage() {
       window.removeEventListener("saved-searches-updated", fetchSavedSearches)
     }
   }, [])
+
+  // Cargar historial de vistas del usuario
+  const fetchViewHistory = async (page: number = 1) => {
+    const token = localStorage.getItem("token")
+    if (!token) return
+
+    try {
+      setLoadingHistory(true)
+      const res = await apiService.getViewHistory(page, 20)
+      setViewHistory(res.views || [])
+      setHistoryPage(res.page)
+      setHistoryTotalPages(res.pages)
+      setHistoryTotal(res.total)
+    } catch (error) {
+      console.error('Error cargando historial:', error)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'historial') {
+      fetchViewHistory(historyPage)
+    }
+  }, [activeTab, historyPage])
+
+  // Formatear tiempo relativo ("Visto hace X minutos", "Visto ayer", etc.)
+  const formatTimeAgo = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffSecs = Math.floor(diffMs / 1000)
+    const diffMins = Math.floor(diffSecs / 60)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffSecs < 60) return "Visto hace un momento"
+    if (diffMins < 60) return `Visto hace ${diffMins} ${diffMins === 1 ? 'minuto' : 'minutos'}`
+    if (diffHours < 24) return `Visto hace ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}`
+    if (diffDays === 1) return "Visto ayer"
+    if (diffDays < 7) return `Visto hace ${diffDays} días`
+    if (diffDays < 30) return `Visto hace ${Math.floor(diffDays / 7)} ${Math.floor(diffDays / 7) === 1 ? 'semana' : 'semanas'}`
+    return `Visto el ${date.toLocaleDateString('es-BO', { day: 'numeric', month: 'short', year: 'numeric' })}`
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -1048,10 +1098,197 @@ export default function PerfilPage() {
 
               {activeTab === 'historial' && (
                 <Card>
-                  <CardContent className="p-12 text-center">
-                    <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Historial</h3>
-                    <p className="text-muted-foreground mb-4">Tu historial de propiedades vistas</p>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                        <Clock className="w-5 h-5 text-primary" />
+                        Historial de Propiedades Vistas
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {historyTotal === 0
+                          ? "No has visto ninguna propiedad aún"
+                          : `Has visto ${historyTotal} ${historyTotal === 1 ? 'propiedad' : 'propiedades'}`}
+                      </p>
+                    </div>
+                    {viewHistory.length > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={async () => {
+                          if (confirm("¿Estás seguro de que deseas limpiar todo tu historial de vistas?")) {
+                            try {
+                              await apiService.clearViewHistory()
+                              setViewHistory([])
+                              setHistoryTotal(0)
+                              setHistoryPage(1)
+                              setHistoryTotalPages(1)
+                              toast.success("Historial limpiado correctamente")
+                            } catch (err) {
+                              toast.error("Error al limpiar el historial")
+                            }
+                          }
+                        }}
+                        className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Limpiar Historial
+                      </Button>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    {loadingHistory ? (
+                      <div className="flex justify-center py-12">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      </div>
+                    ) : viewHistory.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="space-y-3">
+                          {viewHistory.map((item) => {
+                            const property = item.property
+                            if (!property) return null
+
+                            // Obtener la imagen principal
+                            const mainImage = property.imagenes && property.imagenes.length > 0
+                              ? property.imagenes.find(img => img.principal) || property.imagenes[0]
+                              : null
+
+                            // Formatear precio
+                            const moneda = property.moneda === 'BOB' ? 'Bs' : '$'
+                            let precioFormateado = `${moneda} ${property.precio.toLocaleString()}`
+                            if (property.tipo_operacion === 'alquiler') {
+                              precioFormateado += '/mes'
+                            } else if (property.tipo_operacion === 'anticretico') {
+                              precioFormateado += ' Anticrético'
+                            }
+
+                            return (
+                              <div key={item.id} className="relative group">
+                                <button
+                                  onClick={() => router.push(`/propiedades/${property.id}`)}
+                                  className="w-full text-left"
+                                >
+                                  <Card className="transition-all hover:shadow-md hover:border-primary/50">
+                                    <CardContent className="p-4">
+                                      <div className="flex gap-4">
+                                        {/* Imagen */}
+                                        <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200 relative">
+                                          {mainImage ? (
+                                            <img
+                                              src={getImageUrl(mainImage.image_url) || ''}
+                                              alt={property.titulo}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-300">
+                                              <ImageIcon className="w-8 h-8 text-gray-400" />
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Información */}
+                                        <div className="flex-1 min-w-0 pr-12">
+                                          <h4 className="font-semibold text-gray-900 group-hover:text-primary transition-colors mb-1 truncate text-base">
+                                            {property.titulo}
+                                          </h4>
+                                          <div className="flex items-center gap-1 text-sm text-gray-600 mb-1">
+                                            <MapPin className="w-4 h-4 flex-shrink-0" />
+                                            <span className="truncate">{property.zona}</span>
+                                          </div>
+                                          <div className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1.5">
+                                            <Clock className="w-3.5 h-3.5 text-primary" />
+                                            <span>{formatTimeAgo(item.viewed_at)}</span>
+                                          </div>
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-lg font-bold text-primary">
+                                              {precioFormateado}
+                                            </span>
+                                            <span className={`text-xs px-2 py-1 rounded-full ${
+                                              property.estado_propiedad === 'activo'
+                                                ? 'bg-green-100 text-green-800'
+                                                : property.estado_propiedad === 'vendido'
+                                                ? 'bg-blue-100 text-blue-800'
+                                                : property.estado_propiedad === 'inactivo'
+                                                ? 'bg-gray-100 text-gray-800'
+                                                : 'bg-yellow-100 text-yellow-800'
+                                            }`}>
+                                              {property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </button>
+
+                                {/* Botón para quitar del historial */}
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation()
+                                    e.preventDefault()
+                                    try {
+                                      await apiService.deleteViewHistoryItem(item.id)
+                                      toast.success("Eliminado del historial")
+                                      fetchViewHistory(historyPage)
+                                    } catch (error) {
+                                      console.error("Error al eliminar del historial:", error)
+                                      toast.error("No se pudo eliminar del historial")
+                                    }
+                                  }}
+                                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-red-50 text-red-500 hover:text-red-600 transition-colors z-10"
+                                  title="Eliminar del historial"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Paginación */}
+                        {historyTotalPages > 1 && (
+                          <div className="flex items-center justify-center gap-2 pt-6 border-t">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              disabled={historyPage === 1}
+                              onClick={() => setHistoryPage(prev => Math.max(prev - 1, 1))}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            
+                            {Array.from({ length: historyTotalPages }, (_, i) => i + 1).map((p) => (
+                              <Button
+                                key={p}
+                                variant={historyPage === p ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setHistoryPage(p)}
+                                className="w-9 h-9 p-0"
+                              >
+                                {p}
+                              </Button>
+                            ))}
+
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              disabled={historyPage === historyTotalPages}
+                              onClick={() => setHistoryPage(prev => Math.min(prev + 1, historyTotalPages))}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-500 mb-1">Aún no tienes historial de vistas</p>
+                        <p className="text-sm text-gray-400 mb-4 font-medium">Explora propiedades para guardarlas automáticamente aquí</p>
+                        <Button onClick={() => router.push('/propiedades')}>
+                          Ver propiedades
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

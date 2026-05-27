@@ -58,6 +58,14 @@ export default function PropertyDetailPage() {
           num_asesores: propertyData.asesores_asignados?.length || 0
         })
         setProperty(propertyData)
+
+        // Registrar vista automáticamente si el usuario está logueado
+        const token = localStorage.getItem("token")
+        if (token) {
+          apiService.recordView(propertyData.id).catch(() => {
+            // Silenciar errores de registro de vista para no molestar al usuario
+          })
+        }
       } catch (error) {
         console.error('Error cargando propiedad:', error)
         toast.error('Error al cargar la propiedad')

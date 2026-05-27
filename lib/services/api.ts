@@ -521,6 +521,40 @@ class ApiService {
     })
     return this.handleResponse(response)
   }
+
+  // === HISTORIAL DE VISTAS ===
+
+  async recordView(propertyId: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/view-history`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ property_id: propertyId }),
+    })
+    return this.handleResponse(response)
+  }
+
+  async getViewHistory(page: number = 1, limit: number = 20): Promise<{ views: ViewHistoryItem[]; total: number; page: number; limit: number; pages: number }> {
+    const response = await fetch(`${getApiUrl()}/api/view-history?page=${page}&limit=${limit}`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async clearViewHistory(): Promise<{ message: string; deleted: number }> {
+    const response = await fetch(`${getApiUrl()}/api/view-history`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async deleteViewHistoryItem(id: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/view-history/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
 }
 
 // Interface para planes de suscripción
@@ -557,8 +591,17 @@ interface Notification {
   is_read: boolean
 }
 
+interface ViewHistoryItem {
+  id: number
+  user_id: number
+  property_id: number
+  property: Property
+  viewed_at: string
+  created_at: string
+}
+
 export const apiService = new ApiService()
 // Exportar como 'api' para compatibilidad con componentes existentes
 export const api = apiService
-export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan, SavedSearch, Notification }
+export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan, SavedSearch, Notification, ViewHistoryItem }
 
