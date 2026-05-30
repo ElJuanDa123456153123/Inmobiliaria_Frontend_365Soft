@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { Users, LogOut, Settings, Key, User, Building, UserCog, Layers, Globe } from "lucide-react"
+import { Users, LogOut, Settings, Key, User, Building, UserCog, Layers, Globe, BarChart3 } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminLayout({
@@ -113,6 +113,17 @@ export default function AdminLayout({
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
+          <Link
+            href="/admin/analytics"
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive('/admin/analytics')
+                ? 'bg-primary text-white font-semibold'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            }`}
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span className="font-medium">Panel de Estadísticas</span>
+          </Link>
           <Link
             href="/admin"
             className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
