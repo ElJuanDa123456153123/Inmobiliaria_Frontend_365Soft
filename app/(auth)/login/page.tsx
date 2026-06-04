@@ -1,16 +1,20 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionExpired = searchParams.get('session') === 'expired'
+  const redirectPath = searchParams.get('redirect')
+
   const [showPassword, setShowPassword] = useState(false)
   const [success, setSuccess] = useState(false)
   const [formData, setFormData] = useState({
@@ -38,10 +42,15 @@ export default function LoginPage() {
       // DEBUG: Ver qué está recibiendo del backend
       console.log("Datos del backend:", data)
       console.log("Rol del usuario:", data.user?.rol)
+      console.log("Token recibido:", data.token ? "SÍ" : "NO")
 
       // Guardar token y nombre de usuario
       localStorage.setItem("token", data.token)
       localStorage.setItem("userName", data.user?.nombre || data.nombre || data.usuario?.nombre || "Usuario")
+
+      // Verificar que se guardó correctamente
+      const tokenGuardado = localStorage.getItem("token")
+      console.log("Token guardado en localStorage:", tokenGuardado ? "SÍ" : "NO")
 
       // Verificar si es administrador, asesor (agente) o inmobiliaria
       if (data.user?.rol === "admin" || data.user?.rol === "inmobiliaria") {
@@ -53,17 +62,21 @@ export default function LoginPage() {
       // Disparar evento para actualizar el header
       window.dispatchEvent(new Event("auth-change"))
 
+      console.log("redirectPath:", redirectPath)
+
       // Si es admin, asesor (agente) o inmobiliaria, redirigir al panel de administración
       if (data.user?.rol === "admin" || data.user?.rol === "agente" || data.user?.rol === "inmobiliaria") {
         setSuccess(true)
         setTimeout(() => {
-          router.push("/admin")
+          console.log("Redirigiendo a:", redirectPath || "/admin")
+          router.push(redirectPath || "/admin")
         }, 1500)
       } else {
-        // Usuario normal, redirigir al home
+        // Usuario normal, redirigir al home o a la página donde estaba
         setSuccess(true)
         setTimeout(() => {
-          router.push("/")
+          console.log("Redirigiendo a:", redirectPath || "/")
+          router.push(redirectPath || "/")
         }, 3000)
       }
 
@@ -138,6 +151,17 @@ export default function LoginPage() {
 
       <main className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary/5 via-background to-primary/5">
         <div className="max-w-md w-full space-y-8">
+          {/* Session Expired Message */}
+          {sessionExpired && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Tu sesión ha expirado</p>
+                <p className="text-xs text-amber-700 mt-1">Por seguridad, tu sesión cerró automáticamente. Inicia sesión nuevamente para continuar.</p>
+              </div>
+            </div>
+          )}
+
           {/* Header */}
           <div className="text-center">
             <h2 className="text-3xl font-bold text-foreground">
@@ -223,11 +247,14 @@ export default function LoginPage() {
                 </label>
               </div>
 
+              {/* TODO: Crear página de recuperación de contraseña */}
+              {/*
               <div className="text-sm">
                 <Link href="/recuperar-password" className="font-medium text-primary hover:text-primary/80">
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
+              */}
             </div>
 
             {/* Submit */}
@@ -301,5 +328,21 @@ export default function LoginPage() {
       <Footer />
     </div>
     </>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+        </main>
+        <Footer />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

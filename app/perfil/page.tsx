@@ -21,18 +21,25 @@ import {
   BellOff,
   Trash2,
   Eye,
+  CreditCard,
+  TrendingUp,
+  Building2,
+  Calendar,
+  CheckCircle2,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { apiService, UserProfile, Property, SavedSearch, ViewHistoryItem } from "@/lib/services/api"
+import { apiService, UserProfile, Property, SavedSearch, ViewHistoryItem, Subscription, QrPago } from "@/lib/services/api"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { getImageUrl } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { ExpiracionBadge } from "@/components/propiedades/ExpiracionBadge"
 
-type TabType = 'resumen' | 'editar_perfil' | 'busquedas' | 'favoritos' | 'historial' | 'consultas'
+type TabType = 'resumen' | 'editar_perfil' | 'busquedas' | 'favoritos' | 'historial' | 'consultas' | 'suscripciones'
 
 export default function PerfilPage() {
   const router = useRouter()
@@ -51,6 +58,10 @@ export default function PerfilPage() {
   const [historyPage, setHistoryPage] = useState(1)
   const [historyTotalPages, setHistoryTotalPages] = useState(1)
   const [historyTotal, setHistoryTotal] = useState(0)
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [payments, setPayments] = useState<QrPago[]>([])
+  const [loadingSubscription, setLoadingSubscription] = useState(true)
+  const [loadingPayments, setLoadingPayments] = useState(true)
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -217,6 +228,37 @@ export default function PerfilPage() {
     }
   }, [activeTab, historyPage])
 
+  // Cargar suscripción y pagos
+  useEffect(() => {
+    const fetchSubscriptionData = async () => {
+      const token = localStorage.getItem("token")
+      if (!token) return
+
+      try {
+        // Cargar suscripción
+        const subData = await apiService.getMySubscription()
+        setSubscription(subData)
+      } catch (error) {
+        console.log('No tiene suscripción:', error)
+        setSubscription(null)
+      } finally {
+        setLoadingSubscription(false)
+      }
+
+      try {
+        // Cargar historial de pagos
+        const paymentsData = await apiService.getMyPayments()
+        setPayments(paymentsData.pagos || [])
+      } catch (error) {
+        console.error('Error cargando pagos:', error)
+      } finally {
+        setLoadingPayments(false)
+      }
+    }
+
+    fetchSubscriptionData()
+  }, [])
+
   // Formatear tiempo relativo ("Visto hace X minutos", "Visto ayer", etc.)
   const formatTimeAgo = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -235,7 +277,6 @@ export default function PerfilPage() {
     if (diffDays < 30) return `Visto hace ${Math.floor(diffDays / 7)} ${Math.floor(diffDays / 7) === 1 ? 'semana' : 'semanas'}`
     return `Visto el ${date.toLocaleDateString('es-BO', { day: 'numeric', month: 'short', year: 'numeric' })}`
   }
-
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("userName")
@@ -317,6 +358,7 @@ export default function PerfilPage() {
     { id: 'resumen' as TabType, label: 'Resumen', icon: User },
     { id: 'busquedas' as TabType, label: 'Mis Búsquedas', icon: Search },
     { id: 'favoritos' as TabType, label: 'Favoritos', icon: Heart },
+    { id: 'suscripciones' as TabType, label: 'Suscripciones', icon: CreditCard },
     { id: 'historial' as TabType, label: 'Historial', icon: Clock },
     { id: 'consultas' as TabType, label: 'Consultas', icon: MessageCircle },
   ]
@@ -549,17 +591,20 @@ export default function PerfilPage() {
                                             <span className="text-lg font-bold text-primary">
                                               {precioFormateado}
                                             </span>
-                                            <span className={`text-xs px-2 py-1 rounded-full ${
-                                              property.estado_propiedad === 'activo'
-                                                ? 'bg-green-100 text-green-800'
-                                                : property.estado_propiedad === 'vendido'
-                                                ? 'bg-blue-100 text-blue-800'
-                                                : property.estado_propiedad === 'inactivo'
-                                                ? 'bg-gray-100 text-gray-800'
-                                                : 'bg-yellow-100 text-yellow-800'
-                                            }`}>
-                                              {property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                              <ExpiracionBadge fechaExpiracion={property.fecha_expiracion || null} />
+                                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                                property.estado_propiedad === 'activo'
+                                                  ? 'bg-green-100 text-green-800'
+                                                  : property.estado_propiedad === 'vendido'
+                                                  ? 'bg-blue-100 text-blue-800'
+                                                  : property.estado_propiedad === 'inactivo'
+                                                  ? 'bg-gray-100 text-gray-800'
+                                                  : 'bg-yellow-100 text-yellow-800'
+                                              }`}>
+                                                {property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)}
+                                              </span>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
@@ -1291,6 +1336,214 @@ export default function PerfilPage() {
                     )}
                   </CardContent>
                 </Card>
+              )}
+
+              {activeTab === 'suscripciones' && (
+                <div className="space-y-6">
+                  {/* Suscripción Actual */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5" />
+                        Mi Suscripción Actual
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingSubscription ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                        </div>
+                      ) : subscription ? (
+                        <div className="space-y-6">
+                          {/* Métricas principales */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 border border-primary/20">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Building2 className="w-5 h-5 text-primary" />
+                                <span className="text-sm text-gray-600">Disponibles</span>
+                              </div>
+                              <p className="text-3xl font-bold text-primary">
+                                {(subscription.plan?.limite_propiedades || 0) - (subscription.propiedades_usadas || 0)}
+                              </p>
+                              <p className="text-xs text-gray-500">propiedades</p>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-lg p-4 border border-green-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                <span className="text-sm text-gray-600">Usadas</span>
+                              </div>
+                              <p className="text-3xl font-bold text-green-600">
+                                {subscription.propiedades_usadas || 0}
+                              </p>
+                              <p className="text-xs text-gray-500">propiedades</p>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-lg p-4 border border-blue-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Home className="w-5 h-5 text-blue-600" />
+                                <span className="text-sm text-gray-600">Total</span>
+                              </div>
+                              <p className="text-3xl font-bold text-blue-600">
+                                {subscription.plan?.limite_propiedades || 0}
+                              </p>
+                              <p className="text-xs text-gray-500">en el plan</p>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-lg p-4 border border-amber-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Calendar className="w-5 h-5 text-amber-600" />
+                                <span className="text-sm text-gray-600">Vigencia</span>
+                              </div>
+                              <p className="text-2xl font-bold text-amber-700">
+                                {subscription.plan?.duracion_meses || 0} {(subscription.plan?.duracion_meses || 0) === 1 ? 'mes' : 'meses'}
+                              </p>
+                              <p className="text-xs text-gray-500">hasta el {new Date(subscription.fecha_fin).toLocaleDateString('es-BO', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                            </div>
+                          </div>
+
+                          {/* Detalles del plan */}
+                          <div className="border-t pt-6">
+                            <h3 className="font-semibold text-gray-900 mb-4">{subscription.plan?.nombre || "Plan"}</h3>
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center pb-3 border-b">
+                                <span className="text-gray-600">Precio pagado</span>
+                                <span className="text-xl font-bold text-primary">
+                                  Bs.{subscription.plan?.precio?.toLocaleString() || "0"}
+                                </span>
+                              </div>
+
+                              {subscription.plan?.caracteristicas && (
+                                <div className="space-y-2">
+                                  <p className="text-sm font-medium text-gray-700">Características incluidas:</p>
+                                  <div className="grid md:grid-cols-2 gap-2">
+                                    {subscription.plan.caracteristicas.split(',').map((caracteristica, index) => (
+                                      <div key={index} className="flex items-start gap-2 text-sm">
+                                        <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                        <span className="text-gray-700">{caracteristica.trim()}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center pt-3">
+                                <span className="text-gray-600">Método de pago</span>
+                                <Badge variant="outline">{subscription.plan?.metodo_pago || "QR"}</Badge>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Botón para publicar */}
+                          {((subscription.plan?.limite_propiedades || 0) - (subscription.propiedades_usadas || 0)) > 0 && (
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-semibold text-green-800">¡Tienes publicaciones disponibles!</p>
+                                  <p className="text-sm text-green-600">
+                                    {((subscription.plan?.limite_propiedades || 0) - (subscription.propiedades_usadas || 0)) === 1
+                                      ? "Te queda 1 propiedad disponible"
+                                      : `Te quedan ${(subscription.plan?.limite_propiedades || 0) - (subscription.propiedades_usadas || 0)} propiedades disponibles`
+                                    }
+                                  </p>
+                                </div>
+                                <Button
+                                  onClick={() => router.push('/publicar')}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  <Home className="w-4 h-4 mr-2" />
+                                  Publicar
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <CreditCard className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                          <h3 className="text-xl font-semibold mb-2">No tienes una suscripción activa</h3>
+                          <p className="text-gray-500 mb-4">Selecciona un plan para comenzar a publicar tus propiedades</p>
+                          <Button onClick={() => router.push('/planes')} className="bg-primary hover:bg-primary/90">
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            Ver Planes Disponibles
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Historial de Pagos */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <CreditCard className="w-5 h-5" />
+                        Historial de Pagos
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingPayments ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                        </div>
+                      ) : payments.length > 0 ? (
+                        <div className="space-y-3">
+                          {payments.map((payment) => (
+                            <div key={payment.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                    payment.estado === 'PAGADO'
+                                      ? 'bg-green-100 text-green-600'
+                                      : payment.estado === 'PENDIENTE'
+                                      ? 'bg-yellow-100 text-yellow-600'
+                                      : 'bg-red-100 text-red-600'
+                                  }`}>
+                                    <CreditCard className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-gray-900">Bs.{payment.monto?.toLocaleString() || "0"}</p>
+                                    <p className="text-sm text-gray-500">Ref: {payment.alias}</p>
+                                  </div>
+                                </div>
+                                <Badge
+                                  variant={payment.estado === 'PAGADO' ? 'default' : 'secondary'}
+                                  className={payment.estado === 'PAGADO' ? 'bg-green-600' : ''}
+                                >
+                                  {payment.estado}
+                                </Badge>
+                              </div>
+
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                  <p className="text-gray-500 mb-1">Fecha</p>
+                                  <p className="font-medium">{new Date(payment.created_at).toLocaleDateString('es-BO')}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500 mb-1">Vencimiento</p>
+                                  <p className="font-medium">{new Date(payment.fecha_vencimiento).toLocaleDateString('es-BO')}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500 mb-1">Plan</p>
+                                  <p className="font-medium">{payment.plan_id ? `Plan #${payment.plan_id}` : 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500 mb-1">Método</p>
+                                  <p className="font-medium">QR</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-gray-500 mb-1">No tienes pagos registrados</p>
+                          <p className="text-sm text-gray-400">Tus pagos aparecerán aquí</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               )}
 
               {activeTab === 'consultas' && (

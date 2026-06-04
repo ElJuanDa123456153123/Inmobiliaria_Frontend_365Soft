@@ -138,6 +138,7 @@ interface Property {
   destacado: boolean
   vistas_contador: number
   fecha_publicacion?: string
+  fecha_expiracion?: string | null // Fecha en que se eliminará automáticamente la publicación (solo visible para el dueño)
   created_at: string
   updated_at: string
   // Datos del vendedor (snapshot)
@@ -185,6 +186,24 @@ class ApiService {
 
   private async handleResponse(response: Response) {
     if (!response.ok) {
+      // Manejar específicamente errores de autenticación (401)
+      if (response.status === 401) {
+        // Limpiar token expirado
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token')
+          localStorage.removeItem('userName')
+          localStorage.removeItem('isAdmin')
+          localStorage.removeItem('isAdvisor')
+
+          // Redirigir a login con mensaje
+          const currentPath = window.location.pathname
+          if (currentPath !== '/ingresar' && currentPath !== '/registro') {
+            window.location.href = `/ingresar?redirect=${encodeURIComponent(currentPath)}&session=expired`
+          }
+        }
+        throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.')
+      }
+
       const error = await response.json().catch(() => ({ error: 'Error desconocido' }))
       throw new Error(error.error || 'Error en la petición')
     }
@@ -555,6 +574,98 @@ class ApiService {
     })
     return this.handleResponse(response)
   }
+
+  // === PLANES Y PAGOS ===
+
+  // Obtener planes activos (público - alias para getPlanes)
+  async getActivePlans(): Promise<{ planes: Plan[] }> {
+    return this.getPlanes()
+  }
+
+  // === PAGOS QR ===
+
+  // Crear un pago QR
+  async createPayment(data: {
+    property_id: number
+    plan_id: number
+  }): Promise<QrPago> {
+    const response = await fetch(`${getApiUrl()}/api/payments/create`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Obtener estado de un pago QR
+  async getPaymentStatus(paymentId: number): Promise<{
+    estado: string
+    pago_procesado: boolean
+  }> {
+    const response = await fetch(`${getApiUrl()}/api/payments/${paymentId}/status`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Cancelar un pago QR
+  async cancelPayment(paymentId: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/payments/${paymentId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Obtener mis pagos
+  async getMyPayments(): Promise<{ pagos: QrPago[] }> {
+    const response = await fetch(`${getApiUrl()}/api/payments`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Obtener mi suscripción actual
+  async getMySubscription(): Promise<Subscription> {
+    const response = await fetch(`${getApiUrl()}/api/payments/subscription`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Obtener TODAS mis suscripciones
+  async getMySubscriptions(): Promise<Subscription[]> {
+    const response = await fetch(`${getApiUrl()}/api/payments/subscriptions`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Seleccionar una suscripción específica
+  async selectSubscription(subscriptionId: number): Promise<{ message: string; subscription_id: number }> {
+    const response = await fetch(`${getApiUrl()}/api/payments/subscriptions/${subscriptionId}/select`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Simular pago exitoso (SOLO PARA DESARROLLO/PRUEBAS)
+  async simulatePaymentSuccess(paymentId: number): Promise<{ message: string; pago: QrPago }> {
+    const response = await fetch(`${getApiUrl()}/api/payments/${paymentId}/simulate-success`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
 }
 
 // Interface para planes de suscripción
@@ -566,11 +677,15 @@ interface Plan {
   duracion_meses: number
   limite_propiedades: number
   caracteristicas: string
+  metodo_pago: string
+  color: string // Gradiente de color para el header (ej: "from-amber-500 to-amber-600")
   destacado: boolean
   activo: boolean
   orden: number
 }
 
+
+// Interfaces para búsquedas guardadas y notificaciones
 interface SavedSearch {
   id: number
   created_at: string
@@ -600,8 +715,41 @@ interface ViewHistoryItem {
   created_at: string
 }
 
+// Interface para suscripciones
+interface Subscription {
+  id: number
+  user_id: number
+  plan_id: number
+  fecha_inicio: string
+  fecha_fin: string
+  propiedades_usadas: number
+  estado: string
+  renovacion_automatica: boolean
+  seleccionada: boolean // Campo nuevo: indica si esta suscripción está seleccionada
+  created_at: string
+  updated_at: string
+  plan?: Plan
+}
+
+// Interface para pagos QR
+interface QrPago {
+  id: number
+  alias: string
+  estado: string
+  monto: number
+  moneda: string
+  property_id: number
+  user_id: number
+  plan_id: number
+  fecha_vencimiento: string
+  imagen_qr?: string
+  detalle_glosa: string
+  created_at: string
+  updated_at: string
+}
+
 export const apiService = new ApiService()
 // Exportar como 'api' para compatibilidad con componentes existentes
 export const api = apiService
-export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan, SavedSearch, Notification, ViewHistoryItem }
+export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan, SavedSearch, Notification, ViewHistoryItem, QrPago, Subscription }
 

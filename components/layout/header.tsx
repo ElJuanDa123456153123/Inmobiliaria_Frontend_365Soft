@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { Menu, X, User, Heart, LogOut, ChevronDown, Shield, Bell } from "lucide-react"
+import { Menu, X, User, Heart, LogOut, ChevronDown, Shield, Bell, Crown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { apiService, type Notification } from "@/lib/services/api"
+import { PlanSelector } from "./PlanSelector"
 
 export function Header() {
   const router = useRouter()
@@ -368,6 +369,12 @@ export function Header() {
               </Button>
             </>
           )}
+
+          {/* Selector de Plan - Solo visible si hay usuario logueado */}
+          {isClient && userName && (
+            <PlanSelector />
+          )}
+
           {/* Dropdown "Publica tu Propiedad" */}
           <div className="relative publish-menu-container">
             <Button
@@ -384,6 +391,18 @@ export function Header() {
                 {isPublicarPage ? (
                   <>
                     {/* Opciones cuando está en /publicar */}
+                    <Link
+                      href="/planes"
+                      className="block px-4 py-3 text-sm text-primary hover:bg-muted transition-colors bg-primary/5"
+                      onClick={() => setPublishMenuOpen(false)}
+                    >
+                      <div className="font-semibold flex items-center gap-2">
+                        <Crown className="h-4 w-4" />
+                        Ver Planes de Pago
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">Elige un plan y paga con QR</div>
+                    </Link>
+                    <hr className="my-1 border-border" />
                     <Link
                       href="/publicar/inmobiliaria"
                       className="block px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
@@ -412,6 +431,18 @@ export function Header() {
                 ) : (
                   <>
                     {/* Opciones cuando NO está en /publicar */}
+                    <Link
+                      href="/planes"
+                      className="block px-4 py-3 text-sm text-primary hover:bg-muted transition-colors bg-primary/5"
+                      onClick={() => setPublishMenuOpen(false)}
+                    >
+                      <div className="font-semibold flex items-center gap-2">
+                        <Crown className="h-4 w-4" />
+                        Ver Planes de Pago
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">Elige un plan y paga con QR</div>
+                    </Link>
+                    <hr className="my-1 border-border" />
                     <Link
                       href="/publicar?tipo=dueño-vende"
                       className="block px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"

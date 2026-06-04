@@ -2,25 +2,13 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Check, X, Home, DollarSign, Clock, Star, Zap, AlertCircle, Loader2 } from "lucide-react"
+import { Check, X, Home, DollarSign, Clock, Star, Zap, AlertCircle, Loader2, TrendingUp, Building2, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
-
-// Interface que coincide con el modelo del backend
-interface Plan {
-  id: number
-  nombre: string
-  precio: number
-  descripcion: string
-  duracion_meses: number
-  limite_propiedades: number
-  caracteristicas: string // Separadas por comas
-  destacado: boolean
-  activo: boolean
-  orden: number
-}
+import { Badge } from "@/components/ui/badge"
+import { apiService, Plan, Subscription } from "@/lib/services/api"
 
 // Colores del gradiente basados en el orden/posición del plan
 const planColors = [
@@ -48,30 +36,48 @@ function PublicarContent() {
   const tipo = searchParams.get("tipo")
   const [selectedPlan, setSelectedPlan] = useState<number | null>(null)
   const [planes, setPlanes] = useState<Plan[]>([])
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchPlanes()
+    fetchData()
   }, [])
 
-  const fetchPlanes = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true)
       setError(null)
 
+      // Obtener planes
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
-      const response = await fetch(`${apiUrl}/planes`)
+      const planesResponse = await fetch(`${apiUrl}/planes`)
 
-      if (!response.ok) {
+      if (!planesResponse.ok) {
         throw new Error("Error al obtener los planes")
       }
 
-      const data = await response.json()
-      setPlanes(data.planes || [])
+      const planesData = await planesResponse.json()
+      setPlanes(planesData.planes || [])
+
+      // Obtener suscripción del usuario (si está autenticado)
+      const token = localStorage.getItem("token")
+      if (token) {
+        try {
+          const sub = await apiService.getMySubscription()
+          console.log("✅ Suscripción obtenida:", sub)
+          console.log("✅ Propiedades disponibles:", (sub?.plan?.limite_propiedades || 0) - (sub?.propiedades_usadas || 0))
+          setSubscription(sub)
+        } catch (err) {
+          // No tiene suscripción o error, continuar sin suscripción
+          console.log("❌ No se pudo obtener suscripción:", err)
+        }
+      } else {
+        console.log("❌ No hay token de autenticación")
+      }
     } catch (err: any) {
-      console.error("Error fetching planes:", err)
-      setError("No se pudieron cargar los planes. Intenta de nuevo más tarde.")
+      console.error("Error fetching data:", err)
+      setError("No se pudieron cargar los datos. Intenta de nuevo más tarde.")
     } finally {
       setLoading(false)
     }
@@ -79,14 +85,34 @@ function PublicarContent() {
 
   const handleSelectPlan = (planId: number) => {
     setSelectedPlan(planId)
-    // Redirigir al formulario de registro con el plan seleccionado
-    router.push(`/publicar/registro?plan=${planId}`)
+    // Redirigir a la página de pago QR
+    router.push(`/pagar/${planId}`)
+  }
+
+  const handlePublishProperty = () => {
+    // Redirigir al formulario de registro
+    router.push("/publicar/registro")
   }
 
   const handleContinueWithoutPlan = () => {
     // Redirigir al formulario de registro sin plan seleccionado
     router.push("/publicar/registro")
   }
+
+  // Calcular propiedades disponibles
+  const propiedadesDisponibles = subscription?.plan
+    ? subscription.plan.limite_propiedades - subscription.propiedades_usadas
+    : 0
+
+  const tieneSuscripcionActiva = subscription && propiedadesDisponibles > 0
+
+  console.log("📊 Estado de suscripción:", {
+    tieneSuscripcionActiva,
+    subscription,
+    propiedadesDisponibles,
+    plan: subscription?.plan,
+    propiedadesUsadas: subscription?.propiedades_usadas
+  })
 
   // Parsear características del string separado por comas
   const parseCaracteristicas = (caracteristicas: string): string[] => {
@@ -114,6 +140,90 @@ function PublicarContent() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          {/* Suscripción activa */}
+          {tieneSuscripcionActiva && (
+            <section className="mb-12">
+              <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
+                <CardContent className="p-8">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    {/* Información de suscripción */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+                          <Check className="w-7 h-7 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold text-gray-900">
+                            ¡Tienes un plan activo!
+                          </h2>
+                          <p className="text-gray-600">
+                            Plan {subscription?.plan?.nombre} • Hasta el {new Date(subscription?.fecha_fin || "").toLocaleDateString('es-BO', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Métricas */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white rounded-lg p-4 border border-green-200">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Building2 className="w-5 h-5 text-primary" />
+                            <span className="text-sm text-gray-600">Disponibles</span>
+                          </div>
+                          <p className="text-3xl font-bold text-primary">{propiedadesDisponibles}</p>
+                          <p className="text-xs text-gray-500">propiedades</p>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-4 border border-green-200">
+                          <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="w-5 h-5 text-green-600" />
+                            <span className="text-sm text-gray-600">Usadas</span>
+                          </div>
+                          <p className="text-3xl font-bold text-green-600">{subscription?.propiedades_usadas || 0}</p>
+                          <p className="text-xs text-gray-500">propiedades</p>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-4 border border-green-200">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Home className="w-5 h-5 text-gray-600" />
+                            <span className="text-sm text-gray-600">Total</span>
+                          </div>
+                          <p className="text-3xl font-bold text-gray-900">{subscription?.plan?.limite_propiedades || 0}</p>
+                          <p className="text-xs text-gray-500">en el plan</p>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-4 border border-green-200">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Clock className="w-5 h-5 text-amber-600" />
+                            <span className="text-sm text-gray-600">Vigencia</span>
+                          </div>
+                          <p className="text-2xl font-bold text-gray-900">{subscription?.plan?.duracion_meses || 0}</p>
+                          <p className="text-xs text-gray-500">meses</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botón de acción */}
+                    <div className="md:w-64">
+                      <Button
+                        onClick={handlePublishProperty}
+                        size="lg"
+                        className="w-full h-20 text-lg font-semibold bg-primary hover:bg-primary/90"
+                      >
+                        <Home className="w-6 h-6 mr-2" />
+                        Publicar Propiedad
+                      </Button>
+                      <p className="text-xs text-gray-600 text-center mt-2">
+                        {propiedadesDisponibles === 1
+                          ? "Te queda 1 propiedad disponible"
+                          : `Te quedan ${propiedadesDisponibles} propiedades disponibles`}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
           {/* ¿Por qué publicar con nosotros? */}
           <section className="mb-16">
             <div className="text-center mb-8">
@@ -221,144 +331,164 @@ function PublicarContent() {
           </section>
 
           {/* Tabla comparativa de planes */}
-          <section>
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Elige el plan que mejor se adapte a tus necesidades
-              </h2>
-              <p className="text-lg text-gray-600">
-                Todos los planes incluyen soporte y asistencia personalizada
-              </p>
-            </div>
-
-            {/* Loading state */}
-            {loading && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-                <p className="text-gray-500">Cargando planes disponibles...</p>
+          {!tieneSuscripcionActiva && (
+            <section>
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  Elige el plan que mejor se adapte a tus necesidades
+                </h2>
+                <p className="text-lg text-gray-600">
+                  Todos los planes incluyen soporte y asistencia personalizada
+                </p>
               </div>
-            )}
 
-            {/* Error state */}
-            {error && !loading && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md text-center">
-                  <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-                  <p className="text-red-600 mb-4">{error}</p>
-                  <Button onClick={fetchPlanes} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
-                    Reintentar
-                  </Button>
+              {/* Loading state */}
+              {loading && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+                  <p className="text-gray-500">Cargando planes disponibles...</p>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Empty state */}
-            {!loading && !error && planes.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-8 max-w-md text-center">
-                  <DollarSign className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 mb-2">No hay planes disponibles en este momento</p>
-                  <p className="text-gray-400 text-sm">Puedes continuar y seleccionar un plan más tarde</p>
+              {/* Error state */}
+              {error && !loading && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md text-center">
+                    <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+                    <p className="text-red-600 mb-4">{error}</p>
+                    <Button onClick={fetchData} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+                      Reintentar
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Plans grid */}
-            {!loading && !error && planes.length > 0 && (
-              <div className={`grid gap-6 mb-8 ${
-                planes.length === 1 ? "md:grid-cols-1 max-w-md mx-auto" :
-                planes.length === 2 ? "md:grid-cols-2 max-w-3xl mx-auto" :
-                "md:grid-cols-3"
-              }`}>
-                {planes.map((plan, index) => {
-                  const caracteristicas = parseCaracteristicas(plan.caracteristicas)
-                  const color = getColorForPlan(index)
-                  const duracionLabel = getDuracionLabel(plan.duracion_meses)
+              {/* Empty state */}
+              {!loading && !error && planes.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-8 max-w-md text-center">
+                    <DollarSign className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 mb-2">No hay planes disponibles en este momento</p>
+                    <p className="text-gray-400 text-sm">Puedes continuar y seleccionar un plan más tarde</p>
+                  </div>
+                </div>
+              )}
 
-                  return (
-                    <Card
-                      key={plan.id}
-                      className={`relative flex flex-col h-full overflow-hidden transition-all hover:shadow-xl ${
-                        plan.destacado ? "ring-2 ring-primary shadow-lg scale-105 z-10" : ""
-                      }`}
-                    >
-                      {plan.destacado && (
-                        <div className="absolute top-0 right-0 bg-gradient-to-l from-primary to-primary/80 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg z-10">
-                          Recomendado
-                        </div>
-                      )}
+              {/* Plans grid */}
+              {!loading && !error && planes.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                  {planes.map((plan) => {
+                    const esDestacado = plan.destacado
+                    const caracteristicas = plan.caracteristicas
+                      ? plan.caracteristicas.split(",").map(c => c.trim())
+                      : []
 
-                      <CardHeader className={`bg-gradient-to-r ${color} text-white`}>
-                        <CardTitle className="text-2xl">{plan.nombre}</CardTitle>
-                        <div className="mt-4">
-                          <div className="text-4xl font-bold">{plan.precio} Bs.</div>
-                          <div className="text-white/90 mt-1 flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {duracionLabel}
+                    return (
+                      <Card
+                        key={plan.id}
+                        className={`relative overflow-hidden transition-all hover:shadow-xl ${
+                          esDestacado
+                            ? "border-primary border-2 shadow-lg scale-105"
+                            : "hover:border-primary"
+                        }`}
+                      >
+                        {esDestacado && (
+                          <div className="absolute top-0 right-0 bg-primary text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">
+                            <Star className="w-4 h-4 inline mr-1" />
+                            Recomendado
                           </div>
-                        </div>
-                      </CardHeader>
-
-                      <CardContent className="p-6 flex flex-col flex-1">
-                        {plan.descripcion && (
-                          <p className="text-sm text-gray-600 mb-4">{plan.descripcion}</p>
                         )}
 
-                        <div className="mb-2">
-                          <span className="text-sm font-medium text-gray-600">Propiedades:</span>
-                          <span className="ml-2 text-sm font-semibold text-gray-900">
-                            Hasta {plan.limite_propiedades}
-                          </span>
-                        </div>
+                        <CardHeader className={`bg-gradient-to-r ${plan.color || "from-gray-500 to-gray-600"} text-white text-center pb-4`}>
+                          <CardTitle className="text-2xl font-bold mb-2">
+                            {plan.nombre}
+                          </CardTitle>
+                          <div className="flex items-baseline justify-center gap-1">
+                            <span className="text-5xl font-bold">
+                              Bs.{plan.precio.toLocaleString()}
+                            </span>
+                          </div>
+                          {plan.descripcion && (
+                            <p className="text-sm text-white/90 mt-2">
+                              {plan.descripcion}
+                            </p>
+                          )}
+                        </CardHeader>
 
-                        {caracteristicas.length > 0 && (
-                          <ul className="space-y-3 mb-6">
-                            {caracteristicas.map((caracteristica, idx) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                                <span className="text-sm text-gray-700">
-                                  {caracteristica}
-                                </span>
-                              </li>
+                        <CardContent className="space-y-6">
+                          {/* Características */}
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Home className="w-5 h-5 text-primary flex-shrink-0" />
+                              <span className="font-medium">
+                                {plan.limite_propiedades === 1
+                                  ? "1 propiedad"
+                                  : `${plan.limite_propiedades} propiedades`}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                              <span className="font-medium">
+                                {plan.duracion_meses === 1
+                                  ? "1 mes de vigencia"
+                                  : `${plan.duracion_meses} meses de vigencia`}
+                              </span>
+                            </div>
+
+                            {caracteristicas.map((caracteristica, index) => (
+                              <div key={index} className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                                <span>{caracteristica}</span>
+                              </div>
                             ))}
-                          </ul>
-                        )}
+                          </div>
 
-                        <div className="mt-auto pt-4">
+                          {/* Método de pago */}
+                          <div className="pt-4 border-t">
+                            <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                              <span className="font-medium">Método de pago:</span>
+                              <Badge variant="outline">{plan.metodo_pago}</Badge>
+                            </div>
+                          </div>
+
+                          {/* Botón */}
                           <Button
+                            type="button"
                             onClick={() => handleSelectPlan(plan.id)}
                             className={`w-full ${
-                              plan.destacado
-                                ? "bg-primary hover:bg-primary/90 text-white"
-                                : "bg-white text-gray-800 border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm"
+                              esDestacado
+                                ? "bg-primary hover:bg-primary/90"
+                                : "bg-gray-900 hover:bg-gray-800"
                             }`}
-                            variant={plan.destacado ? "default" : "outline"}
                             size="lg"
                           >
-                            Continuar
+                            Seleccionar Plan
                           </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
 
-            {/* Opción sin plan */}
-            <div className="text-center">
-              <p className="text-gray-600 mb-4">
-                ¿Aún no decides? Puedes continuar y seleccionar un plan más tarde
-              </p>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={handleContinueWithoutPlan}
-              >
-                Continuar sin seleccionar plan
-              </Button>
-            </div>
-          </section>
+              {/* Opción sin plan */}
+              {!loading && !error && (
+                <div className="text-center">
+                  <p className="text-gray-600 mb-4">
+                    ¿Aún no decides? Puedes continuar y seleccionar un plan más tarde
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={handleContinueWithoutPlan}
+                  >
+                    Continuar sin seleccionar plan
+                  </Button>
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </main>
 

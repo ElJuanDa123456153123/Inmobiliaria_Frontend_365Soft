@@ -43,6 +43,7 @@ export interface Property {
   vendedor_email: string
   vendedor_telefono: string
   imagenes?: PropertyImage[]
+  fecha_expiracion?: string | null // Fecha en que se eliminará automáticamente la publicación (solo visible para el dueño)
 }
 
 export interface PropertyImage {
