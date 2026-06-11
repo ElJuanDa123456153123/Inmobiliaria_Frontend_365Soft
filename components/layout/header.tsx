@@ -329,6 +329,14 @@ export function Header() {
                       Perfil
                     </Link>
                     <Link
+                      href="/mi-suscripcion"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Crown className="h-4 w-4" />
+                      Mi Suscripción
+                    </Link>
+                    <Link
                       href="/mis-favoritos"
                       className="flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                       onClick={() => setUserMenuOpen(false)}
@@ -508,6 +516,12 @@ export function Header() {
                     <Link href="/perfil" onClick={() => setMobileMenuOpen(false)}>
                       <User className="h-4 w-4 mr-2" />
                       Perfil
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" asChild className="w-full justify-start">
+                    <Link href="/mi-suscripcion" onClick={() => setMobileMenuOpen(false)}>
+                      <Crown className="h-4 w-4 mr-2" />
+                      Mi Suscripción
                     </Link>
                   </Button>
                   <Button variant="ghost" asChild className="w-full justify-start">
