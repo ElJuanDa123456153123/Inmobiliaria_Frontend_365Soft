@@ -129,7 +129,19 @@ export function Header() {
   // Al hacer clic en una notificación
   const handleNotificationClick = async (notif: Notification) => {
     setNotificationsOpen(false)
-    router.push(`/propiedades/${notif.property_id}`)
+    if (!notif.is_read) {
+      try {
+        await apiService.markNotificationAsRead(notif.id)
+        window.dispatchEvent(new Event("notifications-updated"))
+      } catch (err) {
+        console.error("Error marking notification as read:", err)
+      }
+    }
+    if (notif.property_id) {
+      router.push(`/propiedades/${notif.property_id}`)
+    } else {
+      router.push("/notificaciones")
+    }
   }
 
   // Efecto para cargar notificaciones inicialmente y en intervalos
@@ -274,7 +286,7 @@ export function Header() {
                           No tienes notificaciones
                         </div>
                       ) : (
-                        notifications.map((notif) => (
+                        notifications.slice(0, 5).map((notif) => (
                           <div
                             key={notif.id}
                             onClick={() => handleNotificationClick(notif)}
@@ -300,6 +312,16 @@ export function Header() {
                           </div>
                         ))
                       )}
+                    </div>
+
+                    <div className="border-t border-border p-2 bg-muted/20 text-center">
+                      <Link
+                        href="/notificaciones"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="text-xs text-primary hover:underline font-semibold block w-full py-1"
+                      >
+                        Ver todas las notificaciones
+                      </Link>
                     </div>
                   </div>
                 )}
