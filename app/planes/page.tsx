@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CheckCircle2, Crown, Home, Star } from "lucide-react"
+import { CheckCircle2, Crown, Home, Star, Clock } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
@@ -103,85 +103,94 @@ export default function PlanesPage() {
                 return (
                   <Card
                     key={plan.id}
-                    className={`relative overflow-hidden transition-all hover:shadow-xl ${
-                      esDestacado
-                        ? "border-primary border-2 shadow-lg scale-105"
-                        : "hover:border-primary"
-                    }`}
+                    className={`relative overflow-hidden transition-all duration-300 hover:shadow-2xl bg-white flex flex-col ${esDestacado
+                      ? "border-primary border-2 shadow-xl scale-105 z-10"
+                      : "border-gray-200 hover:border-primary/50 shadow-md"
+                      }`}
                   >
+                    {/* Acento superior sutil con el color del plan */}
+                    <div className={`h-2 w-full bg-gradient-to-r ${plan.color || "from-gray-400 to-gray-500"}`} />
+
                     {esDestacado && (
-                      <div className="absolute top-0 right-0 bg-primary text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">
-                        <Star className="w-4 h-4 inline mr-1" />
+                      <div className="absolute top-4 right-4 bg-primary/10 text-primary border border-primary/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded-full flex items-center shadow-sm">
+                        <Star className="w-3 h-3 inline mr-1" fill="currentColor" />
                         Recomendado
                       </div>
                     )}
 
-                    <CardHeader className={`bg-gradient-to-r ${plan.color || "from-gray-500 to-gray-600"} text-white text-center pb-4`}>
-                      <CardTitle className="text-2xl font-bold mb-2">
+                    <CardHeader className="text-center pt-8 pb-2">
+                      <CardTitle className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">
                         {plan.nombre}
                       </CardTitle>
                       <div className="flex items-baseline justify-center gap-1">
-                        <span className="text-5xl font-bold">
+                        <span className="text-5xl font-extrabold text-gray-900 tracking-tight">
                           Bs.{plan.precio.toLocaleString()}
                         </span>
                       </div>
                       {plan.descripcion && (
-                        <p className="text-sm text-white/90 mt-2">
+                        <p className="text-sm text-gray-500 mt-4 max-w-[90%] mx-auto leading-relaxed">
                           {plan.descripcion}
                         </p>
                       )}
                     </CardHeader>
 
-                    <CardContent className="space-y-6">
+                    <CardContent className="space-y-6 flex-1 flex flex-col pt-6">
                       {/* Características */}
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Home className="w-5 h-5 text-primary flex-shrink-0" />
-                          <span className="font-medium">
+                      <div className="space-y-4 flex-1 px-2">
+                        <div className="flex items-start gap-3 text-sm">
+                          <div className="mt-0.5 bg-primary/10 p-1.5 rounded-full text-primary">
+                            <Home className="w-4 h-4" />
+                          </div>
+                          <span className="font-semibold text-gray-800 pt-1">
                             {plan.limite_propiedades === 1
-                              ? "1 propiedad"
-                              : `${plan.limite_propiedades} propiedades`}
+                              ? "1 propiedad en catálogo"
+                              : `${plan.limite_propiedades} propiedades en catálogo`}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
-                          <span className="font-medium">
+                        <div className="flex items-start gap-3 text-sm">
+                          <div className="mt-0.5 bg-primary/10 p-1.5 rounded-full text-primary">
+                            <Clock className="w-4 h-4" />
+                          </div>
+                          <span className="font-semibold text-gray-800 pt-1">
                             {plan.duracion_meses === 1
                               ? "1 mes de vigencia"
                               : `${plan.duracion_meses} meses de vigencia`}
                           </span>
                         </div>
 
-                        {caracteristicas.map((caracteristica, index) => (
-                          <div key={index} className="flex items-center gap-2 text-sm">
-                            <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
-                            <span>{caracteristica}</span>
-                          </div>
-                        ))}
-                      </div>
+                        <div className="my-5 h-px bg-gray-100 w-full" />
 
-                      {/* Método de pago */}
-                      <div className="pt-4 border-t">
-                        <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                          <span className="font-medium">Método de pago:</span>
-                          <Badge variant="outline">{plan.metodo_pago}</Badge>
+                        <div className="space-y-3">
+                          {caracteristicas.map((caracteristica, index) => (
+                            <div key={index} className="flex items-start gap-3 text-sm">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-600 leading-snug">{caracteristica}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Botón */}
-                      <Button
-                        type="button"
-                        onClick={() => handleSeleccionarPlan(plan.id)}
-                        className={`w-full ${
-                          esDestacado
-                            ? "bg-primary hover:bg-primary/90"
-                            : "bg-gray-900 hover:bg-gray-800"
-                        }`}
-                        size="lg"
-                      >
-                        Seleccionar Plan
-                      </Button>
+                      {/* Método de pago y Botón */}
+                      <div className="pt-6">
+                        <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mb-4">
+                          <span>Paga fácil y rápido con</span>
+                          <Badge variant="secondary" className="bg-gray-100 text-gray-700 font-bold border border-gray-200 uppercase text-[9px]">
+                            {plan.metodo_pago}
+                          </Badge>
+                        </div>
+
+                        <Button
+                          type="button"
+                          onClick={() => handleSeleccionarPlan(plan.id)}
+                          className={`w-full py-6 font-bold text-sm uppercase tracking-wide rounded-xl transition-all shadow-md ${esDestacado
+                            ? `bg-gradient-to-r ${plan.color || "from-primary to-teal-500"} hover:opacity-90 text-white hover:shadow-lg`
+                            : "bg-white text-gray-900 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                            }`}
+                        >
+                          Seleccionar Plan
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 )
@@ -189,18 +198,7 @@ export default function PlanesPage() {
             </div>
           )}
 
-          {/* Información adicional */}
-          <div className="mt-16 text-center text-sm text-gray-600">
-            <p className="mb-2">
-              💰 <strong>Pago seguro con QR</strong> - Escanea con tu app bancaria
-            </p>
-            <p className="mb-2">
-              ⏰ <strong>15 minutos</strong> para completar el pago
-            </p>
-            <p>
-              ✅ <strong>Activación automática</strong> - Tu propiedad se activa al confirmar el pago
-            </p>
-          </div>
+          {/* Footer */}
         </div>
       </main>
 

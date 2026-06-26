@@ -140,7 +140,19 @@ export function Header() {
   // Al hacer clic en una notificación
   const handleNotificationClick = async (notif: Notification) => {
     setNotificationsOpen(false)
-    router.push(`/propiedades/${notif.property_id}`)
+    if (!notif.is_read) {
+      try {
+        await apiService.markNotificationAsRead(notif.id)
+        window.dispatchEvent(new Event("notifications-updated"))
+      } catch (err) {
+        console.error("Error marking notification as read:", err)
+      }
+    }
+    if (notif.property_id) {
+      router.push(`/propiedades/${notif.property_id}`)
+    } else {
+      router.push("/notificaciones")
+    }
   }
 
   // Efecto para cargar notificaciones inicialmente y en intervalos
@@ -288,7 +300,7 @@ export function Header() {
                           No tienes notificaciones
                         </div>
                       ) : (
-                        notifications.map((notif) => (
+                        notifications.slice(0, 5).map((notif) => (
                           <div
                             key={notif.id}
                             onClick={() => handleNotificationClick(notif)}
@@ -314,6 +326,16 @@ export function Header() {
                           </div>
                         ))
                       )}
+                    </div>
+
+                    <div className="border-t border-border p-2 bg-muted/20 text-center">
+                      <Link
+                        href="/notificaciones"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="text-xs text-primary hover:underline font-semibold block w-full py-1"
+                      >
+                        Ver todas las notificaciones
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -341,6 +363,14 @@ export function Header() {
                     >
                       <User className="h-4 w-4" />
                       Perfil
+                    </Link>
+                    <Link
+                      href="/mi-suscripcion"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Crown className="h-4 w-4" />
+                      Mi Suscripción
                     </Link>
                     <Link
                       href="/mis-favoritos"
@@ -535,6 +565,12 @@ export function Header() {
                     <Link href="/perfil" onClick={() => setMobileMenuOpen(false)}>
                       <User className="h-4 w-4 mr-2" />
                       Perfil
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" asChild className="w-full justify-start">
+                    <Link href="/mi-suscripcion" onClick={() => setMobileMenuOpen(false)}>
+                      <Crown className="h-4 w-4 mr-2" />
+                      Mi Suscripción
                     </Link>
                   </Button>
                   <Button variant="ghost" asChild className="w-full justify-start">

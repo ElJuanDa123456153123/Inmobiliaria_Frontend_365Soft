@@ -526,8 +526,14 @@ class ApiService {
     return this.handleResponse(response)
   }
 
-  async getNotifications(): Promise<{ notifications: Notification[]; unread_count: number }> {
-    const response = await fetch(`${getApiUrl()}/api/notifications`, {
+  async getNotifications(page: number = 1, limit: number = 20, isRead?: boolean): Promise<{ notifications: Notification[]; unread_count: number; total: number; total_pages: number; page: number; limit: number }> {
+    const params = new URLSearchParams()
+    params.append('page', page.toString())
+    params.append('limit', limit.toString())
+    if (isRead !== undefined) {
+      params.append('is_read', isRead.toString())
+    }
+    const response = await fetch(`${getApiUrl()}/api/notifications?${params.toString()}`, {
       headers: this.getHeaders(),
     })
     return this.handleResponse(response)
@@ -535,6 +541,22 @@ class ApiService {
 
   async markNotificationsAsRead(): Promise<{ message: string }> {
     const response = await fetch(`${getApiUrl()}/api/notifications/read`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async markAllNotificationsAsRead(): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/notifications/read-all`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async markNotificationAsRead(id: number): Promise<{ message: string; notification: Notification }> {
+    const response = await fetch(`${getApiUrl()}/api/notifications/${id}/read`, {
       method: 'PATCH',
       headers: this.getHeaders(),
     })
@@ -698,12 +720,14 @@ interface SavedSearch {
 interface Notification {
   id: number
   created_at: string
-  saved_search_id?: number
-  saved_search?: SavedSearch
-  property_id: number
-  property: Property
+  tipo: string
+  titulo: string
   mensaje: string
   is_read: boolean
+  saved_search_id?: number
+  saved_search?: SavedSearch
+  property_id?: number
+  property?: Property
 }
 
 interface ViewHistoryItem {
