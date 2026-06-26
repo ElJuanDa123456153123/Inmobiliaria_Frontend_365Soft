@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { Users, LogOut, Settings, Key, User, Building, UserCog, Layers, Globe, BarChart3 } from "lucide-react"
+import { Users, LogOut, Settings, Key, User, Building, UserCog, Layers, Globe, BarChart3, Users2 } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminLayout({
@@ -15,6 +15,8 @@ export default function AdminLayout({
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [userName, setUserName] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string>("Admin")
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isAdvisor, setIsAdvisor] = useState(false)
   const [isClient, setIsClient] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -32,14 +34,22 @@ export default function AdminLayout({
     // Verificar si hay un usuario logueado
     const token = localStorage.getItem("token")
     const name = localStorage.getItem("userName")
-    const isAdmin = localStorage.getItem("isAdmin")
-    const isAdvisor = localStorage.getItem("isAdvisor")
+    const adminFlag = localStorage.getItem("isAdmin")
+    const advisorFlag = localStorage.getItem("isAdvisor")
+    const userRol = localStorage.getItem("userRol")
+
+    // Verificar si es asesor (agente o inmobiliaria, o tiene perfil de asesor)
+    const advisorCheck = advisorFlag === 'true' || userRol === 'agente' || userRol === 'inmobiliaria'
+    const adminCheck = adminFlag === 'true'
+
+    setIsAdmin(adminCheck)
+    setIsAdvisor(advisorCheck)
 
     // Permitir acceso a /admin/publicar sin verificar admin (la página misma establece el flag)
     const isAdminPublicRoute = pathname === '/admin/publicar'
 
     // Permitir acceso a admin o agentes (asesores)
-    if (!token || (!isAdminPublicRoute && isAdmin !== "true" && isAdvisor !== "true")) {
+    if (!token || (!isAdminPublicRoute && !adminCheck && !advisorCheck)) {
       // Si no está logueado o no es admin/asesor (y no es ruta pública), redirigir a login
       router.push("/login")
       return
@@ -50,9 +60,9 @@ export default function AdminLayout({
     }
 
     // Establecer el rol para mostrar en el panel
-    if (isAdmin === "true") {
+    if (adminCheck) {
       setUserRole("Administrador")
-    } else if (isAdvisor === "true") {
+    } else if (advisorCheck) {
       setUserRole("Asesor")
     }
 
@@ -63,12 +73,20 @@ export default function AdminLayout({
     // Escuchar cambios en localStorage
     const updateAuthState = () => {
       const token = localStorage.getItem("token")
-      const isAdmin = localStorage.getItem("isAdmin")
-      const isAdvisor = localStorage.getItem("isAdvisor")
+      const adminFlag = localStorage.getItem("isAdmin")
+      const advisorFlag = localStorage.getItem("isAdvisor")
+      const userRol = localStorage.getItem("userRol")
       const isAdminPublicRoute = pathname === '/admin/publicar'
 
+      // Verificar si es asesor
+      const advisorCheck = advisorFlag === 'true' || userRol === 'agente' || userRol === 'inmobiliaria'
+      const adminCheck = adminFlag === 'true'
+
+      setIsAdmin(adminCheck)
+      setIsAdvisor(advisorCheck)
+
       // Permitir acceso a admin o agentes (asesores)
-      if (!token || (!isAdminPublicRoute && isAdmin !== "true" && isAdvisor !== "true")) {
+      if (!token || (!isAdminPublicRoute && !adminCheck && !advisorCheck)) {
         router.push("/login")
       }
     }
@@ -87,7 +105,10 @@ export default function AdminLayout({
     localStorage.removeItem("userName")
     localStorage.removeItem("isAdmin")
     localStorage.removeItem("isAdvisor")
+    localStorage.removeItem("userRol")
     setUserName(null)
+    setIsAdmin(false)
+    setIsAdvisor(false)
     setUserMenuOpen(false)
     window.dispatchEvent(new Event("auth-change"))
     router.push("/login")
@@ -108,7 +129,9 @@ export default function AdminLayout({
         {/* Logo */}
         <div className="p-6 border-b border-gray-800">
           <h1 className="text-2xl font-bold text-white">365SOFT</h1>
-          <p className="text-sm text-gray-400 mt-1">Panel de Administración</p>
+          <p className="text-sm text-gray-400 mt-1">
+            {isAdmin ? "Panel de Administración" : "Panel de Asesor"}
+          </p>
         </div>
 
         {/* Navigation */}
@@ -124,17 +147,19 @@ export default function AdminLayout({
             <BarChart3 className="h-5 w-5" />
             <span className="font-medium">Panel de Estadísticas</span>
           </Link>
-          <Link
-            href="/admin"
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              isActive('/admin')
-                ? 'bg-primary text-white font-semibold'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            }`}
-          >
-            <Users className="h-5 w-5" />
-            <span className="font-medium">Usuarios Registrados</span>
-          </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                isActive('/admin')
+                  ? 'bg-primary text-white font-semibold'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              <Users className="h-5 w-5" />
+              <span className="font-medium">Usuarios Registrados</span>
+            </Link>
+          )}
           <Link
             href="/admin/propiedades"
             className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
@@ -147,38 +172,53 @@ export default function AdminLayout({
             <span className="font-medium">Gestionar Propiedades</span>
           </Link>
           <Link
-            href="/admin/asesores"
+            href="/admin/crm/clientes"
             className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              isActive('/admin/asesores')
+              isActive('/admin/crm')
                 ? 'bg-primary text-white font-semibold'
                 : 'text-gray-300 hover:bg-gray-800 hover:text-white'
             }`}
           >
-            <UserCog className="h-5 w-5" />
-            <span className="font-medium">Asesores</span>
+            <Users2 className="h-5 w-5" />
+            <span className="font-medium">CRM de Clientes</span>
           </Link>
-          <Link
-            href="/admin/accesos"
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              isActive('/admin/accesos')
-                ? 'bg-primary text-white font-semibold'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            }`}
-          >
-            <Key className="h-5 w-5" />
-            <span className="font-medium">Gestión de Accesos</span>
-          </Link>
-          <Link
-            href="/admin/planes"
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              isActive('/admin/planes')
-                ? 'bg-primary text-white font-semibold'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            }`}
-          >
-            <Layers className="h-5 w-5" />
-            <span className="font-medium">Planes de Suscripción</span>
-          </Link>
+          {isAdmin && (
+            <>
+              <Link
+                href="/admin/asesores"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  isActive('/admin/asesores')
+                    ? 'bg-primary text-white font-semibold'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                }`}
+              >
+                <UserCog className="h-5 w-5" />
+                <span className="font-medium">Asesores</span>
+              </Link>
+              <Link
+                href="/admin/accesos"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  isActive('/admin/accesos')
+                    ? 'bg-primary text-white font-semibold'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                }`}
+              >
+                <Key className="h-5 w-5" />
+                <span className="font-medium">Gestión de Accesos</span>
+              </Link>
+              <Link
+                href="/admin/planes"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  isActive('/admin/planes')
+                    ? 'bg-primary text-white font-semibold'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                }`}
+              >
+                <Layers className="h-5 w-5" />
+                <span className="font-medium">Planes de Suscripción</span>
+              </Link>
+            </>
+          )}
         </nav>
 
         {/* Ver Sitio - Link al sitio principal */}
@@ -210,16 +250,18 @@ export default function AdminLayout({
           {/* Dropdown Menu */}
           {userMenuOpen && (
             <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-              <button
-                onClick={() => {
-                  setUserMenuOpen(false)
-                  router.push("/admin/accesos")
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <Key className="h-4 w-4" />
-                Accesos
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setUserMenuOpen(false)
+                    router.push("/admin/accesos")
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  <Key className="h-4 w-4" />
+                  Accesos
+                </button>
+              )}
               <button
                 onClick={() => {
                   setUserMenuOpen(false)

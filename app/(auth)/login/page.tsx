@@ -47,38 +47,50 @@ function LoginForm() {
       // Guardar token y nombre de usuario
       localStorage.setItem("token", data.token)
       localStorage.setItem("userName", data.user?.nombre || data.nombre || data.usuario?.nombre || "Usuario")
+      localStorage.setItem("userRol", data.user?.rol || "usuario") // Guardar rol completo
 
       // Verificar que se guardó correctamente
       const tokenGuardado = localStorage.getItem("token")
       console.log("Token guardado en localStorage:", tokenGuardado ? "SÍ" : "NO")
-
-      // Verificar si es administrador, asesor (agente) o inmobiliaria
-      if (data.user?.rol === "admin" || data.user?.rol === "inmobiliaria") {
-        localStorage.setItem("isAdmin", "true")
-      } else if (data.user?.rol === "agente") {
-        localStorage.setItem("isAdvisor", "true")
-      }
 
       // Disparar evento para actualizar el header
       window.dispatchEvent(new Event("auth-change"))
 
       console.log("redirectPath:", redirectPath)
 
-      // Si es admin, asesor (agente) o inmobiliaria, redirigir al panel de administración
-      if (data.user?.rol === "admin" || data.user?.rol === "agente" || data.user?.rol === "inmobiliaria") {
-        setSuccess(true)
-        setTimeout(() => {
-          console.log("Redirigiendo a:", redirectPath || "/admin")
-          router.push(redirectPath || "/admin")
-        }, 1500)
-      } else {
-        // Usuario normal, redirigir al home o a la página donde estaba
-        setSuccess(true)
-        setTimeout(() => {
-          console.log("Redirigiendo a:", redirectPath || "/")
-          router.push(redirectPath || "/")
-        }, 3000)
+      // Determinar dashboard según rol y verificaciones adicionales
+      const determineDashboard = async () => {
+        const userRol = data.user?.rol || "usuario"
+
+        // Si es admin, ir al panel de administración
+        if (userRol === "admin") {
+          localStorage.setItem("isAdmin", "true")
+          return "/admin"
+        }
+
+        // Si es inmobiliaria o agente, van al panel de admin (con sidebar limitado)
+        if (userRol === "inmobiliaria" || userRol === "agente") {
+          localStorage.setItem("isAdvisor", "true")
+          // Redirigir al panel de admin, el sidebar solo mostrará "Gestionar Propiedades"
+          return "/admin/propiedades"
+        }
+
+        // Si es usuario normal, ir al home
+        if (userRol === "usuario") {
+          return redirectPath || "/"
+        }
+
+        // Por defecto, usuarios normales van al home
+        return redirectPath || "/"
       }
+
+      const dashboardPath = await determineDashboard()
+
+      setSuccess(true)
+      setTimeout(() => {
+        console.log("Redirigiendo a:", dashboardPath)
+        router.push(dashboardPath)
+      }, 1500)
 
     } catch (error) {
       alert("Error al conectar con el servidor")

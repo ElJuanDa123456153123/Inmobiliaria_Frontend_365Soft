@@ -17,6 +17,7 @@ export function Header() {
   const [publishMenuOpen, setPublishMenuOpen] = useState(false)
   const [userName, setUserName] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isAdvisor, setIsAdvisor] = useState(false)
   const [isClient, setIsClient] = useState(false)
 
   // Estados de notificaciones
@@ -33,9 +34,14 @@ export function Header() {
     const token = localStorage.getItem("token")
     const name = localStorage.getItem("userName")
     const adminFlag = localStorage.getItem("isAdmin")
+    const advisorFlag = localStorage.getItem("isAdvisor")
+    const userRol = localStorage.getItem("userRol")
     if (token && name) {
       setUserName(name)
       setIsAdmin(adminFlag === 'true')
+      // Verificar si es asesor (agente o inmobiliaria, o usuario con perfil de asesor)
+      const isAdvisorUser = advisorFlag === 'true' || userRol === 'agente' || userRol === 'inmobiliaria'
+      setIsAdvisor(isAdvisorUser)
     }
 
     // Función para actualizar el estado desde localStorage
@@ -43,12 +49,17 @@ export function Header() {
       const token = localStorage.getItem("token")
       const name = localStorage.getItem("userName")
       const adminFlag = localStorage.getItem("isAdmin")
+      const advisorFlag = localStorage.getItem("isAdvisor")
+      const userRol = localStorage.getItem("userRol")
       if (token && name) {
         setUserName(name)
         setIsAdmin(adminFlag === 'true')
+        const isAdvisorUser = advisorFlag === 'true' || userRol === 'agente' || userRol === 'inmobiliaria'
+        setIsAdvisor(isAdvisorUser)
       } else {
         setUserName(null)
         setIsAdmin(false)
+        setIsAdvisor(false)
       }
     }
 
@@ -174,8 +185,11 @@ export function Header() {
     localStorage.removeItem("token")
     localStorage.removeItem("userName")
     localStorage.removeItem("isAdmin")
+    localStorage.removeItem("isAdvisor")
+    localStorage.removeItem("userRol")
     setUserName(null)
     setIsAdmin(false)
+    setIsAdvisor(false)
     setUserMenuOpen(false)
 
     // Disparar evento para notificar el cambio
@@ -336,6 +350,19 @@ export function Header() {
                       <Heart className="h-4 w-4" />
                       Favoritos
                     </Link>
+                    {isAdvisor && (
+                      <>
+                        <hr className="my-2 border-border" />
+                        <Link
+                          href="/asesor/mis-propiedades"
+                          className="flex items-center gap-3 px-4 py-2 text-sm text-primary hover:bg-muted transition-colors font-semibold"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Shield className="h-4 w-4" />
+                          Mis Propiedades (Asesor)
+                        </Link>
+                      </>
+                    )}
                     {isAdmin && (
                       <>
                         <hr className="my-2 border-border" />
@@ -516,6 +543,14 @@ export function Header() {
                       Favoritos
                     </Link>
                   </Button>
+                  {isAdvisor && (
+                    <Button variant="ghost" asChild className="w-full justify-start text-primary">
+                      <Link href="/asesor/mis-propiedades" onClick={() => setMobileMenuOpen(false)}>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Mis Propiedades (Asesor)
+                      </Link>
+                    </Button>
+                  )}
                   {isAdmin && (
                     <Button variant="ghost" asChild className="w-full justify-start text-primary">
                       <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>

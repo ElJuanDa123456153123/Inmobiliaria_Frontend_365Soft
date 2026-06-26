@@ -121,18 +121,18 @@ export default function AnalyticsPage() {
 
   if (!data) return null
 
-  // Mapear datos para gráficos
-  const chartPropsByDay = data.properties_by_day.map(d => ({
+  // Mapear datos para gráficos con safe checks
+  const chartPropsByDay = (data.properties_by_day || []).map(d => ({
     label: d.date.substring(5), // Solo mostrar MM-DD
     value: d.count
   }))
 
-  const chartPropsByType = data.properties_by_type.map(t => ({
+  const chartPropsByType = (data.properties_by_type || []).map(t => ({
     label: t.type,
     value: t.count
   }))
 
-  const chartIncomeByMonth = data.income_by_month.map(m => ({
+  const chartIncomeByMonth = (data.income_by_month || []).map(m => ({
     label: m.month,
     value: m.amount
   }))
@@ -256,13 +256,14 @@ export default function AnalyticsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {data.most_viewed_properties.map((property) => {
-                const thumbnail = property.PropertyImages && property.PropertyImages.length > 0 
-                  ? property.PropertyImages[0].url 
-                  : null
+              {data.most_viewed_properties && data.most_viewed_properties.length > 0 ? (
+                data.most_viewed_properties.map((property) => {
+                  const thumbnail = property.PropertyImages && property.PropertyImages.length > 0
+                    ? property.PropertyImages[0].url
+                    : null
 
-                return (
-                  <tr key={property.id} className="hover:bg-gray-50/50 transition-colors">
+                  return (
+                    <tr key={property.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {thumbnail ? (
@@ -305,8 +306,19 @@ export default function AnalyticsPage() {
                       </span>
                     </td>
                   </tr>
-                )
-              })}
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <Building2 className="h-12 w-12 text-gray-300" />
+                      <p className="text-gray-500 font-medium">No hay propiedades para mostrar</p>
+                      <p className="text-gray-400 text-sm">Las propiedades más vistas aparecerán aquí</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
