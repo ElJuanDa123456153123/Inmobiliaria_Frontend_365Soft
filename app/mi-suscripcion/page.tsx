@@ -228,8 +228,9 @@ export default function MiSuscripcionPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {allSubs.map((sub) => {
                     const isSelected = sub.seleccionada
-                    const isExp = sub.estado !== 'ACTIVA' || new Date(sub.fecha_fin) < new Date()
-                    
+                    // Corregir validación: suscripción expirada si no está ACTIVA o si fecha_fin es pasada
+                    const isExp = sub.estado !== 'ACTIVA' || (sub.fecha_fin && new Date(sub.fecha_fin) < new Date())
+
                     return (
                       <Card
                         key={sub.id}

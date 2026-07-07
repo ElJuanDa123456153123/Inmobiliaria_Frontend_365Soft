@@ -548,7 +548,7 @@ class ApiService {
   }
 
   async markAllNotificationsAsRead(): Promise<{ message: string }> {
-    const response = await fetch(`${getApiUrl()}/api/notifications/read-all`, {
+    const response = await fetch(`${getApiUrl()}/api/notifications/read`, {
       method: 'PATCH',
       headers: this.getHeaders(),
     })
@@ -642,6 +642,20 @@ class ApiService {
     return this.handleResponse(response)
   }
 
+  // Subir comprobante de pago
+  async uploadProof(data: {
+    qr_pago_id: number
+    image: string // Base64
+  }): Promise<{ message: string; qr_pago_id: number; estado: string; comprobante_url: string }> {
+    const response = await fetch(`${getApiUrl()}/api/payments/proof`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+
+    return this.handleResponse(response)
+  }
+
   // Obtener mis pagos
   async getMyPayments(): Promise<{ pagos: QrPago[] }> {
     const response = await fetch(`${getApiUrl()}/api/payments`, {
@@ -683,6 +697,91 @@ class ApiService {
   async simulatePaymentSuccess(paymentId: number): Promise<{ message: string; pago: QrPago }> {
     const response = await fetch(`${getApiUrl()}/api/payments/${paymentId}/simulate-success`, {
       method: 'POST',
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // === DOCUMENTOS ===
+
+  // Obtener documentos del usuario
+  async getDocuments(page: number = 1, limit: number = 20, type?: string, all: boolean = false): Promise<{ documents: Document[]; total: number; total_pages: number; page: number; limit: number }> {
+    const params = new URLSearchParams()
+    params.append('page', page.toString())
+    params.append('limit', limit.toString())
+    if (type) {
+      params.append('type', type)
+    }
+
+    // Si all es true, usar el endpoint de admin
+    const endpoint = all ? '/api/documents/all' : '/api/documents'
+
+    const response = await fetch(`${getApiUrl()}${endpoint}?${params.toString()}`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Obtener todos los documentos (admin only)
+  async getAllDocuments(page: number = 1, limit: number = 50, type?: string): Promise<{ documents: Document[]; total: number; total_pages: number; page: number; limit: number }> {
+    return this.getDocuments(page, limit, type, true)
+  }
+
+  // Obtener documentos públicos
+  async getPublicDocuments(page: number = 1, limit: number = 20): Promise<{ documents: Document[]; total: number; total_pages: number; page: number; limit: number }> {
+    const params = new URLSearchParams()
+    params.append('page', page.toString())
+    params.append('limit', limit.toString())
+
+    const response = await fetch(`${getApiUrl()}/api/documents/public?${params.toString()}`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Obtener documentos de una propiedad
+  async getPropertyDocuments(propertyId: number): Promise<{ documents: Document[]; total: number }> {
+    const response = await fetch(`${getApiUrl()}/api/documents/property/${propertyId}`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Subir un documento
+  async uploadDocument(data: UploadDocumentRequest): Promise<{ message: string; document: Document }> {
+    const formData = new FormData()
+    formData.append('file', data.file)
+    formData.append('type', data.type)
+    formData.append('title', data.title)
+    if (data.property_id) {
+      formData.append('property_id', data.property_id.toString())
+    }
+    if (data.is_public !== undefined) {
+      formData.append('is_public', data.is_public.toString())
+    }
+    if (data.description) {
+      formData.append('description', data.description)
+    }
+
+    const response = await fetch(`${getApiUrl()}/api/documents`, {
+      method: 'POST',
+      headers: {
+        ...(typeof window !== 'undefined' && localStorage.getItem('token') && { 'Authorization': `Bearer ${localStorage.getItem('token')}` }),
+      },
+      body: formData,
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Eliminar un documento
+  async deleteDocument(documentId: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/documents/${documentId}`, {
+      method: 'DELETE',
       headers: this.getHeaders(),
     })
 
@@ -772,8 +871,39 @@ interface QrPago {
   updated_at: string
 }
 
+// Interface para documentos
+interface Document {
+  id: number
+  user_id: number
+  property_id?: number
+  type: string
+  title: string
+  file_url: string
+  file_name: string
+  file_size: number
+  mime_type: string
+  file_type?: string
+  is_public: boolean
+  description?: string
+  created_at: string
+  updated_at: string
+  property?: Property
+  user?: UserProfile
+  user_name?: string
+  user_email?: string
+}
+
+interface UploadDocumentRequest {
+  file: File
+  type: string
+  title: string
+  property_id?: number
+  is_public?: boolean
+  description?: string
+}
+
 export const apiService = new ApiService()
 // Exportar como 'api' para compatibilidad con componentes existentes
 export const api = apiService
-export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan, SavedSearch, Notification, ViewHistoryItem, QrPago, Subscription }
+export type { UserProfile, UpdateProfileRequest, DatosPublicosRequest, CreatePropertyRequest, Property, Plan, SavedSearch, Notification, ViewHistoryItem, QrPago, Subscription, Document, UploadDocumentRequest }
 

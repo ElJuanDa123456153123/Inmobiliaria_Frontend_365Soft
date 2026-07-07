@@ -5,6 +5,7 @@ import { FeaturedPropertiesServer } from "@/components/home/featured-properties-
 import { ValueSection } from "@/components/home/value-section"
 import { AppPromotion } from "@/components/home/app-promotion"
 import { RecommendedSearches } from "@/components/home/recommended-searches"
+import { RecommendationsSection } from "@/components/recommendations/recommendations-section"
 
 // Forzar renderizado dinámico para evitar fetch durante build
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,9 @@ export default function Home() {
       <main className="flex-1">
         <HeroSection />
         <FeaturedPropertiesServer />
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          <RecommendationsSection />
+        </div>
         <ValueSection />
         <AppPromotion />
         <RecommendedSearches />

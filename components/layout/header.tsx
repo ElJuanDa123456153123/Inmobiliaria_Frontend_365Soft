@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { Menu, X, User, Heart, LogOut, ChevronDown, Shield, Bell, Crown } from "lucide-react"
+import { Menu, X, User, Heart, LogOut, ChevronDown, Shield, Bell, Crown, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { apiService, type Notification } from "@/lib/services/api"
@@ -30,6 +30,13 @@ export function Header() {
 
   useEffect(() => {
     setIsClient(true)
+
+    // Inicializar el color de acento guardado
+    const savedAccent = localStorage.getItem('accent-color')
+    if (savedAccent) {
+      document.documentElement.setAttribute('data-accent', savedAccent)
+    }
+
     // Verificar si hay un usuario logueado
     const token = localStorage.getItem("token")
     const name = localStorage.getItem("userName")
@@ -148,7 +155,10 @@ export function Header() {
         console.error("Error marking notification as read:", err)
       }
     }
-    if (notif.property_id) {
+    // Si es pago confirmado y no tiene property_id, ir a /publicar/exito
+    if (notif.tipo === "pago_confirmado" && !notif.property_id) {
+      router.push("/publicar/exito")
+    } else if (notif.property_id) {
       router.push(`/propiedades/${notif.property_id}`)
     } else {
       router.push("/notificaciones")
@@ -380,6 +390,14 @@ export function Header() {
                       <Heart className="h-4 w-4" />
                       Favoritos
                     </Link>
+                    <Link
+                      href="/mis-documentos"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Mis Documentos
+                    </Link>
                     {isAdvisor && (
                       <>
                         <hr className="my-2 border-border" />
@@ -577,6 +595,12 @@ export function Header() {
                     <Link href="/mis-favoritos" onClick={() => setMobileMenuOpen(false)}>
                       <Heart className="h-4 w-4 mr-2" />
                       Favoritos
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" asChild className="w-full justify-start">
+                    <Link href="/mis-documentos" onClick={() => setMobileMenuOpen(false)}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Mis Documentos
                     </Link>
                   </Button>
                   {isAdvisor && (

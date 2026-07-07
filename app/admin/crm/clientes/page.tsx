@@ -131,15 +131,15 @@ export default function ClientsPage() {
   const totalPages = Math.ceil(pagination.total / pagination.limit)
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-background">
       <main className="flex-1">
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">CRM - Clientes</h1>
-                <p className="mt-1 text-sm text-gray-500">Gestiona tus clientes y seguimientos</p>
+                <h1 className="text-3xl font-bold text-foreground">CRM - Clientes</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Gestiona tus clientes y seguimientos</p>
               </div>
               <Button onClick={() => setShowAddModal(true)} size="lg">
                 <Plus className="w-5 h-5 mr-2" />
@@ -155,10 +155,10 @@ export default function ClientsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-600">Nuevos</p>
-                      <p className="text-2xl font-bold text-blue-600">{stats.nuevos}</p>
+                      <p className="text-xs text-muted-foreground">Nuevos</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.nuevos}</p>
                     </div>
-                    <Users className="h-8 w-8 text-blue-500" />
+                    <Users className="h-8 w-8 text-blue-500 dark:text-blue-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -167,10 +167,10 @@ export default function ClientsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-600">Contactados</p>
-                      <p className="text-2xl font-bold text-yellow-600">{stats.contactados}</p>
+                      <p className="text-xs text-muted-foreground">Contactados</p>
+                      <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.contactados}</p>
                     </div>
-                    <Phone className="h-8 w-8 text-yellow-500" />
+                    <Phone className="h-8 w-8 text-yellow-500 dark:text-yellow-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -179,10 +179,10 @@ export default function ClientsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-600">Interesados</p>
-                      <p className="text-2xl font-bold text-green-600">{stats.interesados}</p>
+                      <p className="text-xs text-muted-foreground">Interesados</p>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.interesados}</p>
                     </div>
-                    <TrendingUp className="h-8 w-8 text-green-500" />
+                    <TrendingUp className="h-8 w-8 text-green-500 dark:text-green-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -191,10 +191,10 @@ export default function ClientsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-600">Negociación</p>
-                      <p className="text-2xl font-bold text-orange-600">{stats.en_negociacion}</p>
+                      <p className="text-xs text-muted-foreground">Negociación</p>
+                      <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.en_negociacion}</p>
                     </div>
-                    <Calendar className="h-8 w-8 text-orange-500" />
+                    <Calendar className="h-8 w-8 text-orange-500 dark:text-orange-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -203,10 +203,10 @@ export default function ClientsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-600">Cerrados</p>
-                      <p className="text-2xl font-bold text-green-700">{stats.cerrados}</p>
+                      <p className="text-xs text-muted-foreground">Cerrados</p>
+                      <p className="text-2xl font-bold text-green-700 dark:text-green-400">{stats.cerrados}</p>
                     </div>
-                    <Building2 className="h-8 w-8 text-green-600" />
+                    <Building2 className="h-8 w-8 text-green-600 dark:text-green-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -215,10 +215,10 @@ export default function ClientsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-600">Perdidos</p>
-                      <p className="text-2xl font-bold text-red-600">{stats.perdidos}</p>
+                      <p className="text-xs text-muted-foreground">Perdidos</p>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.perdidos}</p>
                     </div>
-                      <Users className="h-8 w-8 text-red-500" />
+                      <Users className="h-8 w-8 text-red-500 dark:text-red-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -232,7 +232,7 @@ export default function ClientsPage() {
                 {/* Búsqueda */}
                 <div className="flex-1">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Buscar por nombre..."
                       value={searchQuery}
@@ -274,16 +274,16 @@ export default function ClientsPage() {
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Cargando clientes...</p>
+              <p className="mt-4 text-muted-foreground">Cargando clientes...</p>
             </div>
           ) : clients.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
-                <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   {searchQuery || statusFilter !== "all" ? "No se encontraron clientes" : "No tienes clientes aún"}
                 </h3>
-                <p className="text-gray-500 mb-4">
+                <p className="text-muted-foreground mb-4">
                   {searchQuery || statusFilter !== "all"
                     ? "Intenta con otros filtros o términos de búsqueda"
                     : "Comienza a agregar clientes para gestionar tus ventas"}
@@ -299,7 +299,7 @@ export default function ClientsPage() {
           ) : (
             <>
               {/* Contador de resultados */}
-              <div className="mb-4 text-sm text-gray-600">
+              <div className="mb-4 text-sm text-muted-foreground">
                 Mostrando {clients.length} de {pagination.total} clientes
               </div>
 
@@ -317,7 +317,7 @@ export default function ClientsPage() {
               {/* Paginación */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     Página {pagination.page} de {totalPages}
                   </p>
                   <div className="flex gap-2">

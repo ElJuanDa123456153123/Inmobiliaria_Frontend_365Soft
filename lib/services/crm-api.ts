@@ -63,6 +63,39 @@ export type InteractionType =
   | 'Nota'
   | 'Reunion'
 
+// ==================== LEAD SCORING ====================
+
+export interface LeadScore {
+  id: number
+  client_id: number
+  score: number
+  level: ScoreLevel
+  has_budget: boolean
+  has_zone: boolean
+  recent_interactions_count: number
+  has_viewed_properties: boolean
+  has_favorites: boolean
+  has_specific_property: boolean
+  origin_bonus: number
+  state_bonus: number
+  last_calculated_at?: string
+  last_interaction_at?: string
+  days_since_last_interaction: number
+  created_at: string
+  updated_at: string
+  client?: Client  // Datos del cliente incluidos opcionalmente
+}
+
+export type ScoreLevel = 'ALTO' | 'MEDIO' | 'BAJO'
+
+export interface ScoreStats {
+  total: number
+  avg_score: number
+  high_count: number
+  medium_count: number
+  low_count: number
+}
+
 export interface FunnelStats {
   nuevos: number
   contactados: number
@@ -212,6 +245,63 @@ class CrmApiService {
       headers: this.getHeaders(),
     })
     return this.handleResponse<Interaction[]>(response)
+  }
+
+  // ==================== LEAD SCORING ====================
+
+  async getLeadScore(clientId: number): Promise<LeadScore> {
+    const response = await fetch(`${API_URL}/api/crm/clients/${clientId}/score`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<LeadScore>(response)
+  }
+
+  async recalculateLeadScore(clientId: number): Promise<LeadScore> {
+    const response = await fetch(`${API_URL}/api/crm/clients/${clientId}/score/recalculate`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<LeadScore>(response)
+  }
+
+  async getAllLeadScores(recalculate: boolean = false): Promise<{ scores: LeadScore[]; total: number }> {
+    const queryParams = new URLSearchParams()
+    if (recalculate) queryParams.append('recalculate', 'true')
+
+    const url = `${API_URL}/api/crm/leads/scores${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<{ scores: LeadScore[]; total: number }>(response)
+  }
+
+  async getTopLeads(limit: number = 20): Promise<{ leads: LeadScore[]; total: number }> {
+    const response = await fetch(`${API_URL}/api/crm/leads/top?limit=${limit}`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<{ leads: LeadScore[]; total: number }>(response)
+  }
+
+  async getLeadsByLevel(level: ScoreLevel): Promise<{ leads: LeadScore[]; total: number; level: ScoreLevel }> {
+    const response = await fetch(`${API_URL}/api/crm/leads/by-level/${level}`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<{ leads: LeadScore[]; total: number; level: ScoreLevel }>(response)
+  }
+
+  async getScoreStats(): Promise<ScoreStats> {
+    const response = await fetch(`${API_URL}/api/crm/leads/scores/stats`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<ScoreStats>(response)
+  }
+
+  async recalculateAllScores(): Promise<{ message: string }> {
+    const response = await fetch(`${API_URL}/api/crm/leads/scores/recalculate-all`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<{ message: string }>(response)
   }
 }
 

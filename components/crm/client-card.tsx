@@ -1,14 +1,16 @@
-import { Client, ClientStatus } from "@/lib/services/crm-api"
+import { Client, ClientStatus, LeadScore } from "@/lib/services/crm-api"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Phone, Mail, Building2, Clock } from "lucide-react"
+import { LeadScoreBadge } from "./lead-score-badge"
 
 interface ClientCardProps {
   client: Client
+  leadScore?: LeadScore
   onClick?: () => void
 }
 
-export function ClientCard({ client, onClick }: ClientCardProps) {
+export function ClientCard({ client, leadScore, onClick }: ClientCardProps) {
   const getStatusColor = (status: ClientStatus) => {
     switch (status) {
       case "Nuevo":
@@ -87,9 +89,19 @@ export function ClientCard({ client, onClick }: ClientCardProps) {
               </div>
             )}
           </div>
-          <Badge className={`${getStatusColor(client.estado)} text-white`}>
-            {client.estado}
-          </Badge>
+          <div className="flex flex-col gap-2 items-end">
+            <Badge className={`${getStatusColor(client.estado)} text-white`}>
+              {client.estado}
+            </Badge>
+            {leadScore && (
+              <LeadScoreBadge
+                level={leadScore.level}
+                score={leadScore.score}
+                size="sm"
+                showLabel={false}
+              />
+            )}
+          </div>
         </div>
 
         {/* Información de contacto */}

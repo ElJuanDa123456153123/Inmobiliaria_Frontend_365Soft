@@ -90,6 +90,10 @@ export default function NotificacionesPage() {
         return <UserPlus className="h-5 w-5 text-violet-500" />
       case "pago_confirmado":
         return <CreditCard className="h-5 w-5 text-emerald-600" />
+      case "pago_proceso":
+        return <Clock className="h-5 w-5 text-blue-600" />
+      case "pago_error":
+        return <AlertTriangle className="h-5 w-5 text-red-600" />
       case "busqueda_coincidencia":
         return <Search className="h-5 w-5 text-indigo-500" />
       default:
@@ -114,6 +118,10 @@ export default function NotificacionesPage() {
         return "bg-violet-50"
       case "pago_confirmado":
         return "bg-emerald-50"
+      case "pago_proceso":
+        return "bg-blue-50"
+      case "pago_error":
+        return "bg-red-50"
       case "busqueda_coincidencia":
         return "bg-indigo-50"
       default:
@@ -138,6 +146,10 @@ export default function NotificacionesPage() {
         return "Asignación"
       case "pago_confirmado":
         return "Pago Confirmado"
+      case "pago_proceso":
+        return "Pago en Proceso"
+      case "pago_error":
+        return "Pago con Error"
       case "busqueda_coincidencia":
         return "Búsqueda Guardada"
       default:
@@ -269,7 +281,7 @@ export default function NotificacionesPage() {
 
                       {/* Botones de acción / enlaces profundos */}
                       <div className="flex flex-wrap items-center gap-3 mt-4">
-                        {notif.property_id && (
+                        {notif.property_id ? (
                           <Button
                             onClick={() => router.push(`/propiedades/${notif.property_id}`)}
                             size="sm"
@@ -278,6 +290,16 @@ export default function NotificacionesPage() {
                           >
                             <Eye className="h-4 w-4 mr-2" />
                             Ver propiedad
+                          </Button>
+                        ) : notif.tipo === "pago_confirmado" && (
+                          <Button
+                            onClick={() => router.push("/publicar/exito")}
+                            size="sm"
+                            variant="secondary"
+                            className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 font-semibold"
+                          >
+                            <Check className="h-4 w-4 mr-2" />
+                            Ver pago exitoso
                           </Button>
                         )}
 

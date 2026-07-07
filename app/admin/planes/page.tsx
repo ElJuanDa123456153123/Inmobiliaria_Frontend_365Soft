@@ -306,7 +306,7 @@ export default function PlanesPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="animate-pulse text-gray-500 flex items-center gap-2">
+        <div className="animate-pulse text-muted-foreground flex items-center gap-2">
           <Layers className="animate-bounce" /> Cargando planes...
         </div>
       </div>
@@ -314,14 +314,14 @@ export default function PlanesPage() {
   }
 
   return (
-    <div className="p-8 pb-20 bg-gray-50/50 min-h-full">
+    <div className="p-8 pb-20 bg-background/50 min-h-full">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 font-serif tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground font-serif tracking-tight flex items-center gap-3">
             <Layers className="h-8 w-8 text-primary" />
             Planes de Suscripción
           </h1>
-          <p className="text-gray-500 mt-1">Configura los paquetes y precios para agentes e inmobiliarias.</p>
+          <p className="text-muted-foreground mt-1">Configura los paquetes y precios para agentes e inmobiliarias.</p>
         </div>
         <Button onClick={openCreateModal} className="shadow-sm">
           <Plus className="h-4 w-4 mr-2" /> Crear Nuevo Plan
@@ -330,16 +330,16 @@ export default function PlanesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {planes.length === 0 ? (
-          <div className="col-span-full py-20 text-center bg-white rounded-xl border-2 border-dashed border-gray-200">
-            <LayoutList className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No hay planes configurados todavía.</p>
+          <div className="col-span-full py-20 text-center bg-card rounded-xl border-2 border-dashed border-border">
+            <LayoutList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No hay planes configurados todavía.</p>
             <Button variant="ghost" className="mt-4" onClick={openCreateModal}>
               Comienza creando uno
             </Button>
           </div>
         ) : (
           planes.map((plan) => (
-            <div key={plan.id} className={`bg-white rounded-xl shadow-sm border ${plan.destacado ? 'border-primary ring-1 ring-primary/20' : 'border-gray-200'} overflow-hidden flex flex-col hover:shadow-md transition-shadow`}>
+            <div key={plan.id} className={`bg-card rounded-xl shadow-sm border ${plan.destacado ? 'border-primary ring-1 ring-primary/20' : 'border-border'} overflow-hidden flex flex-col hover:shadow-md transition-shadow`}>
               {plan.destacado && (
                 <div className="bg-primary text-white text-[10px] font-bold uppercase tracking-widest py-1 text-center">
                   Recomendado
@@ -349,44 +349,44 @@ export default function PlanesPage() {
               <div className={`h-2 bg-gradient-to-r ${plan.color || "from-gray-500 to-gray-600"}`}></div>
               <div className="p-6">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-bold text-gray-900">{plan.nombre}</h3>
+                  <h3 className="text-xl font-bold text-foreground">{plan.nombre}</h3>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-primary" onClick={() => openEditModal(plan)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEditModal(plan)}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-500" onClick={() => handleDelete(plan.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(plan.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="mb-4">
                   <span className="text-3xl font-bold text-primary">{plan.precio} Bs.</span>
-                  <span className="text-gray-400 text-sm ml-1">/ {formatearSuscripcion(plan.duracion_meses)}</span>
+                  <span className="text-muted-foreground text-sm ml-1">/ {formatearSuscripcion(plan.duracion_meses)}</span>
                 </div>
-                <p className="text-gray-600 text-sm mb-6 line-clamp-2 h-10">
+                <p className="text-muted-foreground text-sm mb-6 line-clamp-2 h-10">
                   {plan.descripcion || "Sin descripción proporcionada."}
                 </p>
                 <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <div className="flex items-center gap-3 text-sm text-foreground">
                     <Home className="h-4 w-4 text-primary opacity-70" />
                     <span>Límite: <strong>{plan.limite_propiedades}</strong> propiedades</span>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <div className="flex items-center gap-3 text-sm text-foreground">
                     <Calendar className="h-4 w-4 text-primary opacity-70" />
                     <span>Duración: <strong>{formatearDuracion(plan.duracion_propiedad_minutos)}</strong> por publicación</span>
                   </div>
                   {plan.caracteristicas && plan.caracteristicas.split(',').map((feat, idx) => (
-                    <div key={idx} className="flex items-center gap-3 text-sm text-gray-600">
-                      <Check className="h-4 w-4 text-green-500" />
+                    <div key={idx} className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-green-500 dark:text-green-400" />
                       <span>{feat.trim()}</span>
                     </div>
                   ))}
                 </div>
-                <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${plan.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${plan.activo ? 'bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400' : 'bg-gray-500/10 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'}`}>
                     {plan.activo ? 'Activo' : 'Inactivo'}
                   </span>
-                  <span className="text-xs text-gray-400">Orden: {plan.orden}</span>
+                  <span className="text-xs text-muted-foreground">Orden: {plan.orden}</span>
                 </div>
               </div>
             </div>
@@ -396,20 +396,20 @@ export default function PlanesPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <div className="bg-card w-full max-w-2xl rounded-xl shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-card sticky top-0">
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 {isEditMode ? <Edit className="h-5 w-5 text-primary" /> : <Plus className="h-5 w-5 text-primary" />}
                 {isEditMode ? "Editar Plan" : "Crear Nuevo Plan"}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-6 w-6" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 max-h-[80vh] overflow-y-auto">
               {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
                   <X className="h-4 w-4" /> {error}
                 </div>
               )}
@@ -417,7 +417,7 @@ export default function PlanesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Plan</label>
+                    <label className="block text-sm font-medium text-foreground mb-1">Nombre del Plan</label>
                     <Input
                       required
                       placeholder="Ej. Plan Pro, Plan Platino"
@@ -426,7 +426,7 @@ export default function PlanesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                    <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-1">
                       <DollarSign className="h-3 w-3" /> Precio (Bs.)
                     </label>
                     <Input
@@ -438,7 +438,7 @@ export default function PlanesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                    <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-1">
                       <Calendar className="h-3 w-3" /> Vigencia de la Suscripción
                     </label>
                     <div className="flex gap-2">
@@ -454,7 +454,7 @@ export default function PlanesPage() {
                       <select
                         value={suscripcionUnidad}
                         onChange={e => setSuscripcionUnidad(e.target.value as "anos" | "meses")}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-white"
+                        className="flex-1 px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-card"
                       >
                         <option value="meses">Meses</option>
                         <option value="anos">Años</option>
@@ -465,7 +465,7 @@ export default function PlanesPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                    <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-1">
                       <Home className="h-3 w-3" /> Límite de Propiedades
                     </label>
                     <Input
@@ -476,7 +476,7 @@ export default function PlanesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                    <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-1">
                       <Calendar className="h-3 w-3" /> Duración de Publicación
                     </label>
                     <div className="flex gap-2">
@@ -492,7 +492,7 @@ export default function PlanesPage() {
                       <select
                         value={duracionUnidad}
                         onChange={e => setDuracionUnidad(e.target.value as "meses" | "semanas" | "dias" | "minutos")}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-white"
+                        className="flex-1 px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-card"
                       >
                         <option value="minutos">Minutos</option>
                         <option value="dias">Días</option>
@@ -502,7 +502,7 @@ export default function PlanesPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                    <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-1">
                       <Palette className="h-3 w-3" /> Color del Plan
                     </label>
                     <div className="grid grid-cols-4 gap-2">
@@ -514,15 +514,15 @@ export default function PlanesPage() {
                           className={`relative h-12 rounded-lg border-2 transition-all hover:scale-105 ${
                             formData.color === option.value
                               ? 'border-primary ring-2 ring-primary/50'
-                              : 'border-gray-200 hover:border-gray-300'
+                              : 'border-border hover:border-muted-foreground/30'
                           }`}
                           title={option.label}
                         >
                           <div className={`w-full h-full rounded-md ${option.preview}`}></div>
                           {formData.color === option.value && (
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="bg-white rounded-full p-1 shadow-md">
-                                <Check className="h-3 w-3 text-gray-800" />
+                              <div className="bg-card rounded-full p-1 shadow-md">
+                                <Check className="h-3 w-3 text-foreground" />
                               </div>
                             </div>
                           )}
@@ -531,7 +531,7 @@ export default function PlanesPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Orden de aparición</label>
+                    <label className="block text-sm font-medium text-foreground mb-1">Orden de aparición</label>
                     <Input
                       type="number"
                       value={Number.isNaN(formData.orden) ? "" : formData.orden}
@@ -547,11 +547,11 @@ export default function PlanesPage() {
                           checked={formData.destacado}
                           onChange={e => setFormData({ ...formData, destacado: e.target.checked })}
                         />
-                        <div className={`block w-10 h-6 rounded-full transition-colors ${formData.destacado ? 'bg-primary' : 'bg-gray-200'}`}></div>
-                        <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.destacado ? 'transform translate-x-4' : ''}`}></div>
+                        <div className={`block w-10 h-6 rounded-full transition-colors ${formData.destacado ? 'bg-primary' : 'bg-muted'}`}></div>
+                        <div className={`absolute left-1 top-1 bg-card-foreground w-4 h-4 rounded-full transition-transform ${formData.destacado ? 'transform translate-x-4' : ''}`}></div>
                       </div>
-                      <span className="text-sm text-gray-700 font-medium flex items-center gap-1">
-                        <Star className={`h-3 w-3 ${formData.destacado ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} /> Marcar como Destacado
+                      <span className="text-sm text-foreground font-medium flex items-center gap-1">
+                        <Star className={`h-3 w-3 ${formData.destacado ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} /> Marcar como Destacado
                       </span>
                     </label>
 
@@ -563,10 +563,10 @@ export default function PlanesPage() {
                           checked={formData.activo}
                           onChange={e => setFormData({ ...formData, activo: e.target.checked })}
                         />
-                        <div className={`block w-10 h-6 rounded-full transition-colors ${formData.activo ? 'bg-green-500' : 'bg-gray-200'}`}></div>
-                        <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.activo ? 'transform translate-x-4' : ''}`}></div>
+                        <div className={`block w-10 h-6 rounded-full transition-colors ${formData.activo ? 'bg-green-500' : 'bg-muted'}`}></div>
+                        <div className={`absolute left-1 top-1 bg-card-foreground w-4 h-4 rounded-full transition-transform ${formData.activo ? 'transform translate-x-4' : ''}`}></div>
                       </div>
-                      <span className="text-sm text-gray-700 font-medium">Plan Visible y Activo</span>
+                      <span className="text-sm text-foreground font-medium">Plan Visible y Activo</span>
                     </label>
 
                     <label className="flex items-center gap-3 cursor-pointer group">
@@ -577,12 +577,12 @@ export default function PlanesPage() {
                           checked={formData.permitir_republicacion}
                           onChange={e => setFormData({ ...formData, permitir_republicacion: e.target.checked })}
                         />
-                        <div className={`block w-10 h-6 rounded-full transition-colors ${formData.permitir_republicacion ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
-                        <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.permitir_republicacion ? 'transform translate-x-4' : ''}`}></div>
+                        <div className={`block w-10 h-6 rounded-full transition-colors ${formData.permitir_republicacion ? 'bg-blue-500' : 'bg-muted'}`}></div>
+                        <div className={`absolute left-1 top-1 bg-card-foreground w-4 h-4 rounded-full transition-transform ${formData.permitir_republicacion ? 'transform translate-x-4' : ''}`}></div>
                       </div>
-                      <span className="text-sm text-gray-700 font-medium">
+                      <span className="text-sm text-foreground font-medium">
                         Permitir republicación al eliminar
-                        <span className="block text-xs text-gray-500 font-normal">
+                        <span className="block text-xs text-muted-foreground font-normal">
                           Si está marcado, al eliminar una propiedad el usuario puede publicar otra
                         </span>
                       </span>
@@ -593,27 +593,27 @@ export default function PlanesPage() {
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Descripción</label>
                   <textarea
-                    className="w-full min-h-[80px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    className="w-full min-h-[80px] px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-card"
                     placeholder="Describe brevemente a quién va dirigido este plan..."
                     value={formData.descripcion}
                     onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Características (Separadas por comas)</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Características (Separadas por comas)</label>
                   <textarea
-                    className="w-full min-h-[100px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    className="w-full min-h-[100px] px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-card"
                     placeholder="Soporte 24/7, Reportes VIP, Publicación destacada..."
                     value={formData.caracteristicas}
                     onChange={e => setFormData({ ...formData, caracteristicas: e.target.value })}
                   />
-                  <p className="text-[10px] text-gray-400 mt-1 italic">Cada característica separada por una coma aparecerá con un check verde en el sitio.</p>
+                  <p className="text-[10px] text-muted-foreground mt-1 italic">Cada característica separada por una coma aparecerá con un check verde en el sitio.</p>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">
+              <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-border">
                 <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>
                   Cancelar
                 </Button>

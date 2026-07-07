@@ -92,10 +92,10 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 p-8">
+      <div className="min-h-screen flex items-center justify-center bg-background/50 p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-gray-500 font-medium animate-pulse">Cargando métricas y análisis de datos...</p>
+          <p className="text-muted-foreground font-medium animate-pulse">Cargando métricas y análisis de datos...</p>
         </div>
       </div>
     )
@@ -104,11 +104,11 @@ export default function AnalyticsPage() {
   if (error) {
     return (
       <div className="p-8">
-        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 flex flex-col items-center max-w-lg mx-auto mt-12 text-center">
-          <ShieldAlert className="h-12 w-12 text-red-600 mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Error</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
-          <button 
+        <div className="bg-red-500/10 dark:bg-red-950/20 border border-red-500/20 dark:border-red-800 rounded-2xl p-6 flex flex-col items-center max-w-lg mx-auto mt-12 text-center">
+          <ShieldAlert className="h-12 w-12 text-red-600 dark:text-red-400 mb-4" />
+          <h2 className="text-xl font-bold text-foreground mb-2">Error</h2>
+          <p className="text-muted-foreground mb-6">{error}</p>
+          <button
             onClick={fetchAnalytics}
             className="px-6 py-2 bg-primary text-white rounded-xl font-semibold shadow-sm hover:bg-primary/95 transition-all"
           >
@@ -147,17 +147,17 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 bg-gray-50 min-h-screen">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 bg-background min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Panel de Estadísticas</h1>
-          <p className="text-gray-500 mt-1">Monitoreo en tiempo real del rendimiento de la inmobiliaria, registros e ingresos.</p>
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Panel de Estadísticas</h1>
+          <p className="text-muted-foreground mt-1">Monitoreo en tiempo real del rendimiento de la inmobiliaria, registros e ingresos.</p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-5 py-2.5 bg-card border border-border rounded-xl shadow-sm font-semibold text-foreground hover:bg-muted active:bg-muted/80 transition-all disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           {refreshing ? 'Actualizando...' : 'Actualizar Datos'}
@@ -199,23 +199,23 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-3">
           <div className="flex justify-between items-center px-1">
-            <h2 className="text-lg font-bold text-gray-900">Propiedades por Día</h2>
-            <span className="text-xs font-semibold text-gray-500 bg-gray-200/50 px-2.5 py-1 rounded-lg">Últimos 30 días</span>
+            <h2 className="text-lg font-bold text-foreground">Propiedades por Día</h2>
+            <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-lg">Últimos 30 días</span>
           </div>
-          <LineChart 
-            data={chartPropsByDay} 
-            color="#3b82f6" 
+          <LineChart
+            data={chartPropsByDay}
+            color="#3b82f6"
             valueFormatter={(v) => `${v} props`}
           />
         </div>
 
         <div className="space-y-3">
           <div className="flex justify-between items-center px-1">
-            <h2 className="text-lg font-bold text-gray-900">Distribución por Tipo</h2>
-            <span className="text-xs font-semibold text-gray-500 bg-gray-200/50 px-2.5 py-1 rounded-lg">Histórico</span>
+            <h2 className="text-lg font-bold text-foreground">Distribución por Tipo</h2>
+            <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-lg">Histórico</span>
           </div>
-          <BarChart 
-            data={chartPropsByType} 
+          <BarChart
+            data={chartPropsByType}
             color="#10b981"
             valueFormatter={(v) => `${v}`}
           />
@@ -225,37 +225,37 @@ export default function AnalyticsPage() {
       {/* Fila de Gráficos 2: Ingresos */}
       <div className="space-y-3">
         <div className="flex justify-between items-center px-1">
-          <h2 className="text-lg font-bold text-gray-900">Historial de Ingresos Mensuales</h2>
-          <span className="text-xs font-semibold text-gray-500 bg-gray-200/50 px-2.5 py-1 rounded-lg">Últimos 12 meses (BOB)</span>
+          <h2 className="text-lg font-bold text-foreground">Historial de Ingresos Mensuales</h2>
+          <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-lg">Últimos 12 meses (BOB)</span>
         </div>
-        <LineChart 
-          data={chartIncomeByMonth} 
+        <LineChart
+          data={chartIncomeByMonth}
           color="#f59e0b"
           valueFormatter={(v) => formatCurrency(v)}
         />
       </div>
 
       {/* Tabla de Propiedades Más Vistas */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <Award className="h-5 w-5 text-yellow-500" />
             Top 10 Propiedades Más Vistas
           </h2>
-          <span className="text-xs text-gray-500 font-medium">Ordenado por contador de visitas</span>
+          <span className="text-xs text-muted-foreground font-medium">Ordenado por contador de visitas</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/75 border-b border-gray-100">
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Propiedad</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Precio</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Visitas</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Estado</th>
+              <tr className="bg-muted/50 border-b border-border">
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Propiedad</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Tipo</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider text-right">Precio</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider text-center">Visitas</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider text-center">Estado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-border">
               {data.most_viewed_properties && data.most_viewed_properties.length > 0 ? (
                 data.most_viewed_properties.map((property) => {
                   const thumbnail = property.PropertyImages && property.PropertyImages.length > 0
@@ -263,30 +263,30 @@ export default function AnalyticsPage() {
                     : null
 
                   return (
-                    <tr key={property.id} className="hover:bg-gray-50/50 transition-colors">
+                    <tr key={property.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {thumbnail ? (
-                          <img 
-                            src={thumbnail} 
-                            alt={property.titulo} 
-                            className="h-10 w-14 object-cover rounded-lg border border-gray-100 shadow-sm"
+                          <img
+                            src={thumbnail}
+                            alt={property.titulo}
+                            className="h-10 w-14 object-cover rounded-lg border border-border shadow-sm"
                           />
                         ) : (
-                          <div className="h-10 w-14 bg-gray-100 rounded-lg flex items-center justify-center text-[10px] text-gray-400 font-semibold border border-gray-100">
+                          <div className="h-10 w-14 bg-muted rounded-lg flex items-center justify-center text-[10px] text-muted-foreground font-semibold border border-border">
                             SIN FOTO
                           </div>
                         )}
-                        <span className="font-semibold text-gray-900 text-sm max-w-xs truncate">{property.titulo}</span>
+                        <span className="font-semibold text-foreground text-sm max-w-xs truncate">{property.titulo}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 capitalize">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-muted text-foreground capitalize">
                         {property.tipo_propiedad}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span className="font-bold text-gray-900 text-sm">
+                      <span className="font-bold text-foreground text-sm">
                         {property.moneda} {formatNumber(property.precio)}
                       </span>
                     </td>
@@ -299,8 +299,8 @@ export default function AnalyticsPage() {
                     <td className="px-6 py-4 text-center">
                       <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
                         property.estado_propiedad === 'activo'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                          : 'bg-yellow-50 text-yellow-700 border border-yellow-100'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20'
+                          : 'bg-yellow-500/10 text-yellow-600 dark:bg-yellow-500/20 dark:text-yellow-400 border border-yellow-500/20'
                       }`}>
                         {property.estado_propiedad}
                       </span>
@@ -312,9 +312,9 @@ export default function AnalyticsPage() {
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
-                      <Building2 className="h-12 w-12 text-gray-300" />
-                      <p className="text-gray-500 font-medium">No hay propiedades para mostrar</p>
-                      <p className="text-gray-400 text-sm">Las propiedades más vistas aparecerán aquí</p>
+                      <Building2 className="h-12 w-12 text-muted-foreground" />
+                      <p className="text-muted-foreground font-medium">No hay propiedades para mostrar</p>
+                      <p className="text-muted-foreground/70 text-sm">Las propiedades más vistas aparecerán aquí</p>
                     </div>
                   </td>
                 </tr>
