@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { Menu, X, User, Heart, LogOut, ChevronDown, Shield, Bell, Crown, FileText } from "lucide-react"
+import { Menu, X, User, Heart, LogOut, ChevronDown, Shield, Bell, Crown, FileText, LayoutDashboard, CalendarPlus, CalendarCheck, CalendarX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { apiService, type Notification } from "@/lib/services/api"
@@ -19,6 +19,8 @@ export function Header() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isAdvisor, setIsAdvisor] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [hasActiveProperties, setHasActiveProperties] = useState(false)
+  const [activePropertiesCount, setActivePropertiesCount] = useState(0)
 
   // Estados de notificaciones
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -63,10 +65,13 @@ export function Header() {
         setIsAdmin(adminFlag === 'true')
         const isAdvisorUser = advisorFlag === 'true' || userRol === 'agente' || userRol === 'inmobiliaria'
         setIsAdvisor(isAdvisorUser)
+        checkActiveProperties() // Verificar propiedades activas al actualizar estado
       } else {
         setUserName(null)
         setIsAdmin(false)
         setIsAdvisor(false)
+        setHasActiveProperties(false)
+        setActivePropertiesCount(0)
       }
     }
 
@@ -144,6 +149,34 @@ export function Header() {
     }
   }
 
+  // Verificar si el usuario tiene propiedades activas para mostrar el link al Panel
+  const checkActiveProperties = async () => {
+    const token = localStorage.getItem("token")
+    if (!token) return
+
+    try {
+      const response = await fetch("http://localhost:3001/api/panel/dashboard", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const count = data.propiedades_activas || 0
+        setActivePropertiesCount(count)
+        setHasActiveProperties(count > 0)
+      } else if (response.status === 403) {
+        // No tiene propiedades activas
+        setHasActiveProperties(false)
+        setActivePropertiesCount(0)
+      }
+    } catch (error) {
+      console.error("Error verificando propiedades activas:", error)
+      setHasActiveProperties(false)
+    }
+  }
+
   // Al hacer clic en una notificación
   const handleNotificationClick = async (notif: Notification) => {
     setNotificationsOpen(false)
@@ -155,6 +188,26 @@ export function Header() {
         console.error("Error marking notification as read:", err)
       }
     }
+
+    // Si es visita solicitada (vendedor), ir al panel
+    if (notif.tipo === "visita_solicitada") {
+      router.push("/panel/visitas?tab=recibidas")
+      return
+    }
+
+    // Si es visita confirmada/cancelada (inquilino), abrir su correo
+    if (notif.tipo === "visita_confirmada" || notif.tipo === "visita_cancelada") {
+      try {
+        const metadata = notif.metadata ? JSON.parse(notif.metadata) : null
+        if (metadata?.gmail_url) {
+          window.open(metadata.gmail_url, "_blank")
+          return
+        }
+      } catch { /* sin metadata */ }
+      router.push("/perfil?tab=visitas&subtab=mias")
+      return
+    }
+
     // Si es pago confirmado y no tiene property_id, ir a /publicar/exito
     if (notif.tipo === "pago_confirmado" && !notif.property_id) {
       router.push("/publicar/exito")
@@ -168,6 +221,7 @@ export function Header() {
   // Efecto para cargar notificaciones inicialmente y en intervalos
   useEffect(() => {
     if (userName) {
+      checkActiveProperties() // Verificar propiedades activas
       fetchNotifications()
       // Verificar notificaciones cada 30 segundos
       const interval = setInterval(fetchNotifications, 30000)
@@ -316,8 +370,14 @@ export function Header() {
                             onClick={() => handleNotificationClick(notif)}
                             className={`p-3 text-xs cursor-pointer hover:bg-muted/50 transition-colors flex gap-3 items-start ${!notif.is_read ? 'bg-primary/5 font-medium border-l-2 border-primary' : ''}`}
                           >
-                            <div className="w-10 h-10 rounded bg-muted/60 overflow-hidden shrink-0 border border-border">
-                              {notif.property?.imagenes && notif.property.imagenes.length > 0 ? (
+                              <div className="w-10 h-10 rounded bg-muted/60 overflow-hidden shrink-0 border border-border flex items-center justify-center">
+                              {notif.tipo === "visita_solicitada" ? (
+                                <div className="w-full h-full bg-blue-100 flex items-center justify-center"><CalendarPlus className="h-5 w-5 text-blue-600" /></div>
+                              ) : notif.tipo === "visita_confirmada" ? (
+                                <div className="w-full h-full bg-emerald-100 flex items-center justify-center"><CalendarCheck className="h-5 w-5 text-emerald-600" /></div>
+                              ) : notif.tipo === "visita_cancelada" ? (
+                                <div className="w-full h-full bg-red-100 flex items-center justify-center"><CalendarX className="h-5 w-5 text-red-600" /></div>
+                              ) : notif.property?.imagenes && notif.property.imagenes.length > 0 ? (
                                 <img
                                   src={notif.property.imagenes[0].image_url.startsWith('http') ? notif.property.imagenes[0].image_url : `http://localhost:3001${notif.property.imagenes[0].image_url}`}
                                   className="w-full h-full object-cover"
@@ -398,6 +458,21 @@ export function Header() {
                       <FileText className="h-4 w-4" />
                       Mis Documentos
                     </Link>
+                    {hasActiveProperties && (
+                      <Link
+                        href="/panel"
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-primary hover:bg-muted transition-colors font-semibold"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        Mi Panel
+                        {activePropertiesCount > 0 && (
+                          <span className="ml-auto bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                            {activePropertiesCount}
+                          </span>
+                        )}
+                      </Link>
+                    )}
                     {isAdvisor && (
                       <>
                         <hr className="my-2 border-border" />
@@ -603,6 +678,19 @@ export function Header() {
                       Mis Documentos
                     </Link>
                   </Button>
+                  {hasActiveProperties && (
+                    <Button variant="ghost" asChild className="w-full justify-start text-primary font-semibold">
+                      <Link href="/panel" onClick={() => setMobileMenuOpen(false)}>
+                        <LayoutDashboard className="h-4 w-4 mr-2" />
+                        Mi Panel
+                        {activePropertiesCount > 0 && (
+                          <span className="ml-auto bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                            {activePropertiesCount}
+                          </span>
+                        )}
+                      </Link>
+                    </Button>
+                  )}
                   {isAdvisor && (
                     <Button variant="ghost" asChild className="w-full justify-start text-primary">
                       <Link href="/asesor/mis-propiedades" onClick={() => setMobileMenuOpen(false)}>

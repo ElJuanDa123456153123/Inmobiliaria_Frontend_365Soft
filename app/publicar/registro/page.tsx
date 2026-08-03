@@ -35,8 +35,8 @@ export default function RegistroVendedorPage() {
         const userData = await apiService.getProfile()
 
         // Separar nombre y apellido
-        let nombre = userData.nombre || ""
-        let apellido = userData.apellido || ""
+        let nombre = userData.user?.nombre || ""
+        let apellido = userData.user?.apellido || ""
         let nombreCompleto = ""
 
         if (apellido && apellido.trim()) {
@@ -48,11 +48,11 @@ export default function RegistroVendedorPage() {
         }
 
         setFormData({
-          email: userData.email || "",
+          email: userData.user?.email || "",
           nombreApellido: nombreCompleto,
-          cedula: userData.ci || "", // Solo si ya lo tiene (editó perfil)
+          cedula: userData.user?.ci || "", // Solo si ya lo tiene (editó perfil)
           nombreContacto: nombreCompleto,
-          telefono: userData.telefono || "",
+          telefono: userData.user?.telefono || "",
           horarioContacto: ""
         })
       } catch (error) {

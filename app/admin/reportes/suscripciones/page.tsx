@@ -15,6 +15,24 @@ interface SubscriptionMetrics {
   by_plan: {
     [key: string]: number
   }
+  subscriptions_by_plan: Array<{
+    plan: string
+    count: number
+    subscriptions: Array<{
+      user_id: number
+      user_name: string
+      subscription_id: number
+      start_date: string
+      end_date: string | null
+      monto: number
+    }>
+  }>
+  top_users: Array<{
+    user_id: number
+    user_name: string
+    total_spent: number
+    payment_count: number
+  }>
 }
 
 export default function SuscripcionesReportPage() {
@@ -113,6 +131,10 @@ export default function SuscripcionesReportPage() {
     label: name,
     value: count
   }))
+
+  // Verificar que subscriptions_by_plan existe
+  const subscriptionsByPlan = metrics.subscriptions_by_plan || []
+  const topUsers = metrics.top_users || []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
@@ -241,6 +263,121 @@ export default function SuscripcionesReportPage() {
             </div>
           </div>
         </div>
+
+        {/* Lista de Usuarios por Plan */}
+        {subscriptionsByPlan.length > 0 && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Usuarios con Suscripciones Activas
+              </h3>
+            </div>
+            <div className="divide-y divide-gray-200 dark:divide-gray-800">
+              {subscriptionsByPlan.map((planGroup) => (
+                <div key={planGroup.plan} className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-md font-semibold text-gray-900 dark:text-white">
+                      {planGroup.plan}
+                    </h4>
+                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-sm px-3 py-1 rounded-full">
+                      {planGroup.count} usuarios
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                            Usuario
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                            Fecha Inicio
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                            Fecha Fin
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                            Monto
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                        {planGroup.subscriptions && planGroup.subscriptions.map((sub) => (
+                          <tr key={sub.subscription_id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                              {sub.user_name}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                              {new Date(sub.start_date).toLocaleDateString('es-BO')}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                              {sub.end_date ? new Date(sub.end_date).toLocaleDateString('es-BO') : 'Activa'}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400">
+                              {formatCurrency(sub.monto)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Top Usuarios por Ingresos */}
+        {topUsers.length > 0 && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Top Usuarios por Ingresos Generados
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Usuario
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Total Gastado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Cantidad Pagos
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                  {topUsers.map((user, index) => (
+                    <tr key={user.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                            {index + 1}
+                          </div>
+                          <div className="ml-4">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {user.user_name}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 dark:text-green-400">
+                        {formatCurrency(user.total_spent)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {user.payment_count} pagos
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Información sobre MRR */}
         <div className="bg-gradient-to-r from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 rounded-2xl p-8 border border-primary/20">

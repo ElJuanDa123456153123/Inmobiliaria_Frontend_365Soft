@@ -125,7 +125,7 @@ export function PropertyCard({
           <FavoriteButton propertyId={parseInt(id)} className="bg-white/90 hover:bg-white dark:bg-gray-900/90" />
           <div className="bg-white/90 dark:bg-gray-900/90 px-3 py-1 rounded-full text-sm font-medium">
             <span className={cn("inline-block w-2 h-2 rounded-full mr-1", operationColors[operationType])}></span>
-            {operationType.charAt(0).toUpperCase() + operationType.slice(1)}
+            {operationType ? (operationType.charAt(0).toUpperCase() + operationType.slice(1)) : 'Venta'}
           </div>
         </div>
 

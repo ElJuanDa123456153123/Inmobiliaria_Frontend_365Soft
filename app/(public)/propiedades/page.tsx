@@ -470,7 +470,7 @@ function PropiedadesContent() {
               <div className="mb-6">
                 {/* Title */}
                 <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
-                  {filters.operation !== "todas"
+                  {filters.operation && filters.operation !== "todas"
                     ? `${filters.operation.charAt(0).toUpperCase() + filters.operation.slice(1)} de inmuebles${filters.zona ? ` en ${filters.zona}` : ''}`
                     : `Inmuebles${filters.zona ? ` en ${filters.zona}` : ''}`
                   }

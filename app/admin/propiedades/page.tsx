@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Search, Building, Building2, CheckCircle, Clock, TrendingUp, Trash2, Edit, Eye, Star, Shield, ShieldCheck, MoreHorizontal, UserCog, X, CheckSquare, Square, User, Plus, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,7 @@ import { getImageUrl } from "@/lib/utils"
 
 export default function AdminPropertiesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [properties, setProperties] = useState<AdminProperty[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -24,6 +25,7 @@ export default function AdminPropertiesPage() {
     tipo_operacion: 'all',
     tipo_propiedad: 'all',
     advisor_id: '',
+    sin_asesor: 'all',
   })
   const [stats, setStats] = useState({
     total: 0,
@@ -76,6 +78,12 @@ export default function AdminPropertiesPage() {
   useEffect(() => {
     fetchProperties()
     fetchStats()
+
+    // Verificar si hay parámetro sin_asesor en la URL
+    const sinAsesorParam = searchParams.get('sin_asesor')
+    if (sinAsesorParam === 'true') {
+      setFilters(prev => ({ ...prev, sin_asesor: 'true' }))
+    }
   }, [])
 
   useEffect(() => {
@@ -84,6 +92,7 @@ export default function AdminPropertiesPage() {
 
   const fetchProperties = async () => {
     try {
+      console.log("🔄 [FRONT] fetchProperties llamado con filters:", filters)
       setLoading(true)
       // Transformar filtros: convertir "all" a undefined
       const cleanFilters = {
@@ -94,7 +103,9 @@ export default function AdminPropertiesPage() {
         tipo_propiedad: filters.tipo_propiedad === 'all' ? undefined : filters.tipo_propiedad,
         advisor_id: filters.advisor_id || undefined,
         search: searchTerm || undefined,
+        sin_asesor: filters.sin_asesor === 'all' ? undefined : filters.sin_asesor,
       }
+      console.log("📤 [FRONT] Enviando al API:", cleanFilters)
       const data = await adminApi.listProperties(cleanFilters)
       console.log("📝 Propiedades cargadas:", data.properties.map((p: any) => ({
         id: p.id,
@@ -474,15 +485,26 @@ export default function AdminPropertiesPage() {
                 <SelectItem value="local">Locales</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={filters.sin_asesor} onValueChange={(value) => setFilters({ ...filters, sin_asesor: value })}>
+              <SelectTrigger className="w-[180px] bg-background border-border h-10">
+                <SelectValue placeholder="Asesor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="false">Con asesores</SelectItem>
+                <SelectItem value="true">Sin asesores</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         {/* Properties Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse table-auto">
             <thead>
               <tr className="bg-muted/30 border-b border-border text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                <th className="px-6 py-4 w-12">
+                <th className="px-4 py-3 w-12">
                   <button
                     onClick={handleToggleAllSelection}
                     className="flex items-center justify-center w-full"
@@ -495,21 +517,21 @@ export default function AdminPropertiesPage() {
                     )}
                   </button>
                 </th>
-                <th className="px-6 py-4">ID</th>
-                <th className="px-6 py-4">Título</th>
-                <th className="px-6 py-4">Precio</th>
-                <th className="px-6 py-4">Tipo / Zona</th>
-                <th className="px-6 py-4">Vendedor</th>
-                <th className="px-6 py-4">Asesor</th>
-                <th className="px-6 py-4">Estado</th>
-                <th className="px-6 py-4">Vistas</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-4 py-3">ID</th>
+                <th className="px-4 py-3">Título</th>
+                <th className="px-4 py-3">Precio</th>
+                <th className="px-4 py-3">Tipo / Zona</th>
+                <th className="px-4 py-3">Vendedor</th>
+                <th className="px-4 py-3">Asesor</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3">Vistas</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-background">
               {currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-16 text-center">
+                  <td colSpan={10} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Building className="h-10 w-10 mb-3 opacity-50" />
                       <p className="text-base font-medium">No se encontraron propiedades</p>
@@ -524,7 +546,7 @@ export default function AdminPropertiesPage() {
                       selectedPropertyIds.includes(property.id) ? "bg-primary/10" : ""
                     }`}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <button
                         onClick={() => handleTogglePropertySelection(property.id)}
                         className="flex items-center justify-center"
@@ -536,10 +558,10 @@ export default function AdminPropertiesPage() {
                         )}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-muted-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-muted-foreground">
                       #{property.id}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div>
                         <div className="text-sm font-semibold text-foreground line-clamp-1">{property.titulo}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">
@@ -547,19 +569,19 @@ export default function AdminPropertiesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm font-semibold text-foreground">
                         {property.moneda === 'USD' ? 'U$S' : 'Bs'} {property.precio.toLocaleString()}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="text-sm text-muted-foreground">{property.zona}</div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="text-sm text-foreground">{property.vendedor_nombre}</div>
                       <div className="text-xs text-muted-foreground">{property.user?.email}</div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       {property.asesores_asignados && property.asesores_asignados.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {property.asesores_asignados.map((pa: any) => (
@@ -575,7 +597,7 @@ export default function AdminPropertiesPage() {
                         <span className="text-sm text-muted-foreground">Sin asignar</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${getStatusBadgeColor(property.estado_propiedad)}`}>
                         {getStatusIcon(property.estado_propiedad)}
                         {property.estado_propiedad}
@@ -589,10 +611,10 @@ export default function AdminPropertiesPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                       {property.vistas_contador}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
@@ -654,6 +676,146 @@ export default function AdminPropertiesPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden space-y-4">
+          {currentItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Building className="h-10 w-10 mb-3 opacity-50" />
+              <p className="text-base font-medium">No se encontraron propiedades</p>
+            </div>
+          ) : (
+            currentItems.map((property) => (
+              <div
+                key={property.id}
+                className={`bg-background rounded-xl shadow-sm border p-4 space-y-3 ${
+                  selectedPropertyIds.includes(property.id) ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-muted-foreground">#{property.id}</span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${getStatusBadgeColor(property.estado_propiedad)}`}>
+                        {getStatusIcon(property.estado_propiedad)}
+                        {property.estado_propiedad}
+                      </span>
+                    </div>
+                    <div className="text-sm font-semibold text-foreground line-clamp-1">{property.titulo}</div>
+                    <div className="text-xs text-muted-foreground">{property.zona}</div>
+                  </div>
+                  <button
+                    onClick={() => handleTogglePropertySelection(property.id)}
+                    className="flex-shrink-0"
+                  >
+                    {selectedPropertyIds.includes(property.id) ? (
+                      <CheckSquare className="h-4 w-4 text-primary" />
+                    ) : (
+                      <Square className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Precio:</span>
+                    <span className="ml-1 font-semibold text-foreground">
+                      {property.moneda === 'USD' ? 'U$S' : 'Bs'} {property.precio.toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Vistas:</span>
+                    <span className="ml-1 text-foreground">{property.vistas_contador}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Tipo:</span>
+                    <span className="ml-1 text-foreground">{property.tipo_propiedad}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Operación:</span>
+                    <span className="ml-1 text-foreground">{property.tipo_operacion}</span>
+                  </div>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Vendedor:</span>
+                  <span className="ml-1 text-foreground">{property.vendedor_nombre}</span>
+                </div>
+                {property.asesores_asignados && property.asesores_asignados.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {property.asesores_asignados.map((pa: any) => (
+                      <span
+                        key={pa.id}
+                        className="inline-flex items-center px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded-md"
+                      >
+                        {pa.asesor?.nombre || 'Sin nombre'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {property.destacado && (
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-800">
+                    <Star className="h-3 w-3 fill-current" />
+                    Destacado
+                  </div>
+                )}
+                <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleView(property.id)}
+                    title="Ver en público"
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEdit(property.id)}
+                    title="Editar"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleOpenAdvisorModal(property.id)}
+                    title="Asignar asesor"
+                    className={property.advisor ? "text-purple-600 hover:text-purple-700" : "text-muted-foreground"}
+                  >
+                    <UserCog className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleToggleStatus(property.id)}
+                    title={property.estado_propiedad === 'activo' ? "Desactivar" : "Activar"}
+                    className={property.estado_propiedad === 'activo' ? "text-primary hover:text-primary/80" : "text-muted-foreground hover:text-foreground"}
+                  >
+                    <Shield className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleToggleFeatured(property.id)}
+                    title={property.destacado ? "Quitar destacado" : "Destacar"}
+                    className={property.destacado ? "text-amber-600 hover:text-amber-700" : "text-muted-foreground"}
+                  >
+                    <Star className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(property.id)}
+                    className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Pagination */}

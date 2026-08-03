@@ -10,11 +10,20 @@ interface StatCardProps {
     value: string | number
     isPositive: boolean
   }
+  onClick?: () => void
+  clickable?: boolean
 }
 
-export default function StatCard({ title, value, icon: Icon, description, trend }: StatCardProps) {
+export default function StatCard({ title, value, icon: Icon, description, trend, onClick, clickable }: StatCardProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+    <div
+      className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm transition-all duration-300 transform ${
+        clickable
+          ? 'hover:shadow-md hover:-translate-y-1 cursor-pointer hover:border-primary/50'
+          : 'hover:shadow-md hover:-translate-y-1'
+      }`}
+      onClick={clickable ? onClick : undefined}
+    >
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</span>
         <div className="p-3 rounded-xl bg-primary/10 text-primary">

@@ -401,21 +401,21 @@ export default function AdminAdvisorsPage() {
         </div>
 
         {/* Advisors Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse table-auto">
             <thead>
               <tr className="bg-muted/30 border-b border-border text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                <th className="px-6 py-4">ID</th>
-                <th className="px-6 py-4">Nombre</th>
-                <th className="px-6 py-4">Contacto</th>
-                <th className="px-6 py-4">Estado</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-4 py-3">ID</th>
+                <th className="px-4 py-3">Nombre</th>
+                <th className="px-4 py-3">Contacto</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-background">
               {filteredAdvisors.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center">
+                  <td colSpan={5} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <UserCog className="h-10 w-10 mb-3 opacity-50" />
                       <p className="text-base font-medium">No se encontraron asesores</p>
@@ -425,10 +425,10 @@ export default function AdminAdvisorsPage() {
               ) : (
                 filteredAdvisors.map((advisor) => (
                   <tr key={advisor.id} className="hover:bg-primary/5 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-muted-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-muted-foreground">
                       #{advisor.id}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 rounded-full overflow-hidden border border-primary/20">
                           {advisor.avatar_url ? (
@@ -447,7 +447,7 @@ export default function AdminAdvisorsPage() {
                           {!advisor.avatar_url && (
                             <div className="w-full h-full bg-primary/10 flex items-center justify-center">
                               <span className="text-primary font-bold text-sm">
-                                {advisor.nombre.charAt(0).toUpperCase()}
+                                {advisor.nombre ? advisor.nombre.charAt(0).toUpperCase() : 'A'}
                               </span>
                             </div>
                           )}
@@ -458,10 +458,10 @@ export default function AdminAdvisorsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
                       {advisor.telefono || 'Sin teléfono'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${
                         advisor.activo
                           ? 'bg-emerald-100 text-emerald-800'
@@ -470,7 +470,7 @@ export default function AdminAdvisorsPage() {
                         {advisor.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="ghost"
@@ -506,6 +506,92 @@ export default function AdminAdvisorsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden space-y-4">
+          {filteredAdvisors.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <UserCog className="h-10 w-10 mb-3 opacity-50" />
+              <p className="text-base font-medium">No se encontraron asesores</p>
+            </div>
+          ) : (
+            filteredAdvisors.map((advisor) => (
+              <div key={advisor.id} className="bg-background rounded-xl shadow-sm border border-border p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full overflow-hidden border border-primary/20">
+                    {advisor.avatar_url ? (
+                      <img
+                        src={advisor.avatar_url}
+                        alt={advisor.nombre}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          target.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    {!advisor.avatar_url && (
+                      <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-primary font-bold text-sm">
+                          {advisor.nombre ? advisor.nombre.charAt(0).toUpperCase() : 'A'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-foreground">{advisor.nombre}</div>
+                    <div className="text-xs text-muted-foreground">{advisor.email}</div>
+                    <div className="text-xs text-muted-foreground mt-1">#{advisor.id}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Teléfono:</span>
+                    <span className="ml-1 text-foreground">{advisor.telefono || 'Sin teléfono'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Estado:</span>
+                    <span className={`ml-1 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
+                      advisor.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {advisor.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleToggleActive(advisor.id)}
+                    title={advisor.activo ? "Desactivar" : "Activar"}
+                    className={advisor.activo ? "text-primary hover:text-primary/80" : "text-muted-foreground hover:text-foreground"}
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleOpenEditModal(advisor)}
+                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                    title="Editar"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(advisor.id)}
+                    className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

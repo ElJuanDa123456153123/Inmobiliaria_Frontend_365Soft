@@ -8,7 +8,8 @@ import { apiService, Notification } from "@/lib/services/api"
 import { 
   Bell, Check, CheckSquare, Clock, CreditCard, 
   Filter, Home, Loader2, Search, Trash2, 
-  User, UserPlus, AlertTriangle, Eye, ShieldAlert
+  User, UserPlus, AlertTriangle, Eye, ShieldAlert,
+  CalendarCheck, CalendarX, CalendarPlus, Mail
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -96,6 +97,12 @@ export default function NotificacionesPage() {
         return <AlertTriangle className="h-5 w-5 text-red-600" />
       case "busqueda_coincidencia":
         return <Search className="h-5 w-5 text-indigo-500" />
+      case "visita_solicitada":
+        return <CalendarPlus className="h-5 w-5 text-blue-500" />
+      case "visita_confirmada":
+        return <CalendarCheck className="h-5 w-5 text-emerald-500" />
+      case "visita_cancelada":
+        return <CalendarX className="h-5 w-5 text-red-500" />
       default:
         return <Bell className="h-5 w-5 text-gray-500" />
     }
@@ -124,6 +131,12 @@ export default function NotificacionesPage() {
         return "bg-red-50"
       case "busqueda_coincidencia":
         return "bg-indigo-50"
+      case "visita_solicitada":
+        return "bg-blue-50"
+      case "visita_confirmada":
+        return "bg-emerald-50"
+      case "visita_cancelada":
+        return "bg-red-50"
       default:
         return "bg-gray-50"
     }
@@ -152,6 +165,12 @@ export default function NotificacionesPage() {
         return "Pago con Error"
       case "busqueda_coincidencia":
         return "Búsqueda Guardada"
+      case "visita_solicitada":
+        return "Visita Solicitada"
+      case "visita_confirmada":
+        return "Visita Confirmada"
+      case "visita_cancelada":
+        return "Visita Cancelada"
       default:
         return "Aviso"
     }
@@ -281,6 +300,48 @@ export default function NotificacionesPage() {
 
                       {/* Botones de acción / enlaces profundos */}
                       <div className="flex flex-wrap items-center gap-3 mt-4">
+                        {notif.tipo === "visita_solicitada" ? (
+                          <Button
+                            onClick={() => router.push("/panel/visitas?tab=recibidas")}
+                            size="sm"
+                            variant="secondary"
+                            className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 font-semibold"
+                          >
+                            <CalendarCheck className="h-4 w-4 mr-2" />
+                            Ver visitas
+                          </Button>
+                        ) : (notif.tipo === "visita_confirmada" || notif.tipo === "visita_cancelada") ? (
+                          (() => {
+                            try {
+                              const metadata = notif.metadata ? JSON.parse(notif.metadata) : null
+                              if (metadata?.gmail_url) {
+                                return (
+                                  <Button
+                                    onClick={() => window.open(metadata.gmail_url, "_blank")}
+                                    size="sm"
+                                    variant="secondary"
+                                    className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 font-semibold"
+                                  >
+                                    <Mail className="h-4 w-4 mr-2" />
+                                    Ver correo
+                                  </Button>
+                                )
+                              }
+                            } catch { /* sin metadata */ }
+                            return (
+                              <Button
+                                onClick={() => router.push("/perfil?tab=visitas&subtab=mias")}
+                                size="sm"
+                                variant="secondary"
+                                className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 font-semibold"
+                              >
+                                <CalendarCheck className="h-4 w-4 mr-2" />
+                                Ver visitas
+                              </Button>
+                            )
+                          })()
+                        ) : null}
+
                         {notif.property_id ? (
                           <Button
                             onClick={() => router.push(`/propiedades/${notif.property_id}`)}

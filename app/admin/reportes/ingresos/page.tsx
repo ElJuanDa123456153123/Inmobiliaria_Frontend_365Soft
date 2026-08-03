@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { ArrowLeft, Calendar, Download, Filter, TrendingUp, DollarSign, Users, BarChart3, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Calendar, Download, Filter, TrendingUp, DollarSign, Users, BarChart3, RefreshCw, CheckCircle, Clock, XCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import StatCard from '@/components/admin/StatCard'
 import BarChart from '@/components/admin/BarChart'
@@ -13,8 +13,6 @@ interface Transaction {
   client_name: string
   plan_name: string
   amount: number
-  property_id?: number
-  property_title?: string
 }
 
 interface AdvisorIncome {
@@ -45,8 +43,24 @@ interface IncomeReport {
     month: string
     amount: number
   }>
-  by_advisor?: AdvisorIncome[]
+  by_advisor?: Array<{
+    advisor_id: number
+    name: string
+    amount: number
+    count: number
+  }>
   transactions?: Transaction[]
+  user_payments?: Array<{
+    payment_id: number
+    user_id: number
+    user_name: string
+    email: string
+    amount: number
+    status: string
+    payment_method: string
+    process_date?: string
+    plan_name?: string
+  }>
 }
 
 export default function IngresosReportPage() {
@@ -63,6 +77,21 @@ export default function IngresosReportPage() {
   })
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0])
   const [showTransactions, setShowTransactions] = useState(false)
+
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'PAGADO':
+        return { icon: CheckCircle, label: 'Pagado' }
+      case 'PENDIENTE':
+        return { icon: Clock, label: 'Pendiente' }
+      case 'CANCELADO':
+        return { icon: XCircle, label: 'Cancelado' }
+      case 'EN_PROCESO':
+        return { icon: Loader2, label: 'En Proceso' }
+      default:
+        return { icon: Clock, label: status }
+    }
+  }
 
   const fetchReport = async () => {
     try {
@@ -338,7 +367,8 @@ export default function IngresosReportPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Tabla Desktop */}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-800">
                   <tr>
@@ -353,9 +383,6 @@ export default function IngresosReportPage() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Monto
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Propiedad
                     </th>
                   </tr>
                 </thead>
@@ -374,13 +401,202 @@ export default function IngresosReportPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 dark:text-green-400">
                         {formatCurrency(trx.amount)}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {trx.property_title || '-'}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Cards Móviles */}
+            <div className="lg:hidden p-4 space-y-4">
+              {report.transactions.map((trx) => (
+                <div key={trx.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {trx.client_name}
+                    </span>
+                    <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                      {formatCurrency(trx.amount)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Fecha:</span>
+                      <p className="text-gray-900 dark:text-white mt-1">{trx.date}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Plan:</span>
+                      <p className="text-gray-900 dark:text-white mt-1">{trx.plan_name}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Todos los Pagos Individuales */}
+        {report.user_payments && report.user_payments.length > 0 ? (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Todos los Pagos de Usuarios
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Lista completa de pagos de suscripciones con todos los estados y métodos
+              </p>
+            </div>
+
+            {/* Tabla Desktop - Tablets y Desktop */}
+            <div className="hidden md:block">
+              <div className="overflow-x-auto">
+                <table className="w-full table-auto">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Usuario
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Email
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Plan
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Monto
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Estado
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Método
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Fecha Proceso
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                    {report.user_payments.map((payment) => (
+                      <tr key={payment.payment_id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          {payment.user_name}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                          {payment.email}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          {payment.plan_name || 'Sin Plan'}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400">
+                          {formatCurrency(payment.amount)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            payment.status === 'PAGADO'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : payment.status === 'PENDIENTE'
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              : payment.status === 'CANCELADO'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
+                            {(() => {
+                              const { icon: Icon, label } = getStatusDisplay(payment.status)
+                              return (
+                                <>
+                                  <Icon className="h-3.5 w-3.5" />
+                                  {label}
+                                </>
+                              )
+                            })()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          {payment.payment_method || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {payment.process_date ? new Date(payment.process_date).toLocaleString('es-BO') : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Cards Móviles */}
+            <div className="md:hidden p-4 space-y-4">
+              {report.user_payments.map((payment) => (
+                <div key={payment.payment_id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {payment.user_name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                        {payment.email}
+                      </p>
+                    </div>
+                    <div className="text-right ml-3">
+                      <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                        {formatCurrency(payment.amount)}
+                      </p>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mt-1 ${
+                        payment.status === 'PAGADO'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                          : payment.status === 'PENDIENTE'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          : payment.status === 'CANCELADO'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}>
+                        {(() => {
+                          const { icon: Icon, label } = getStatusDisplay(payment.status)
+                          return (
+                            <>
+                              <Icon className="h-3.5 w-3.5" />
+                              {label}
+                            </>
+                          )
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="min-w-0">
+                      <span className="text-gray-500 dark:text-gray-400 text-xs">Plan:</span>
+                      <p className="text-gray-900 dark:text-white mt-1 truncate" title={payment.plan_name || 'Sin Plan'}>
+                        {payment.plan_name || 'Sin Plan'}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-gray-500 dark:text-gray-400 text-xs">Método:</span>
+                      <p className="text-gray-900 dark:text-white mt-1 truncate">
+                        {payment.payment_method || '-'}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500 dark:text-gray-400 text-xs">Fecha Proceso:</span>
+                      <p className="text-gray-900 dark:text-white mt-1">
+                        {payment.process_date ? new Date(payment.process_date).toLocaleString('es-BO') : '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-gray-800">
+            <div className="text-center">
+              <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                No hay pagos registrados aún
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Cuando los usuarios realicen pagos de suscripciones, aparecerán aquí.
+              </p>
             </div>
           </div>
         )}

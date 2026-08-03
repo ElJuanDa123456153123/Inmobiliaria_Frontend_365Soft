@@ -284,21 +284,21 @@ export default function AccessManagementPage() {
         </div>
 
         {/* Users Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse table-auto">
             <thead>
               <tr className="bg-muted/30 border-b border-border text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                <th className="px-6 py-4">Usuario</th>
-                <th className="px-6 py-4">Rol</th>
-                <th className="px-6 py-4">Estado</th>
-                <th className="px-6 py-4">Registrado</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-4 py-3">Usuario</th>
+                <th className="px-4 py-3">Rol</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3">Registrado</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-background">
               {currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center">
+                  <td colSpan={5} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Shield className="h-10 w-10 mb-3 opacity-50" />
                       <p className="text-base font-medium">No hay accesos encontrados</p>
@@ -308,7 +308,7 @@ export default function AccessManagementPage() {
               ) : (
                 currentItems.map((user) => (
                   <tr key={user.id} className="hover:bg-primary/5 transition-colors group">
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 rounded-full overflow-hidden border border-primary/20">
                           {user.avatar_url ? (
@@ -324,7 +324,7 @@ export default function AccessManagementPage() {
                           ) : (
                             <div className="w-full h-full bg-primary/10 flex items-center justify-center">
                               <span className="text-primary font-bold text-sm">
-                                {user.nombre.charAt(0).toUpperCase()}
+                                {user.nombre ? user.nombre.charAt(0).toUpperCase() : 'U'}
                               </span>
                             </div>
                           )}
@@ -335,21 +335,21 @@ export default function AccessManagementPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider ${getRoleBadgeColor(user.rol)}`}>
                         {user.rol}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div className={`h-2.5 w-2.5 rounded-full ${user.activo ? 'bg-primary' : 'bg-destructive'}`}></div>
                         <span className="text-sm text-foreground font-medium">{user.activo ? 'Permitido' : 'Bloqueado'}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                       {new Date(user.created_at).toLocaleDateString("es-BO")}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                       <Button
                         onClick={() => openEditModal(user)}
                         variant="ghost"
@@ -376,6 +376,84 @@ export default function AccessManagementPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden space-y-4">
+          {currentItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Shield className="h-10 w-10 mb-3 opacity-50" />
+              <p className="text-base font-medium">No hay accesos encontrados</p>
+            </div>
+          ) : (
+            currentItems.map((user) => (
+              <div key={user.id} className="bg-background rounded-xl shadow-sm border border-border p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full overflow-hidden border border-primary/20">
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.nombre}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-primary font-bold text-sm">
+                          {user.nombre ? user.nombre.charAt(0).toUpperCase() : 'U'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-foreground">{user.nombre}</div>
+                    <div className="text-xs text-muted-foreground">{user.email}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Rol:</span>
+                    <span className={`ml-1 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold uppercase tracking-wider ${getRoleBadgeColor(user.rol)}`}>
+                      {user.rol}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Registrado:</span>
+                    <span className="ml-1 text-foreground">{new Date(user.created_at).toLocaleDateString("es-BO")}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`h-2.5 w-2.5 rounded-full ${user.activo ? 'bg-primary' : 'bg-destructive'}`}></div>
+                  <span className="text-sm text-foreground font-medium">{user.activo ? 'Permitido' : 'Bloqueado'}</span>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                  <Button
+                    onClick={() => openEditModal(user)}
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-primary"
+                    title="Modificar Accesos"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  {user.id !== currentUserId && (
+                    <Button
+                      onClick={() => handleDelete(user.id)}
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive"
+                      title="Eliminar Acceso"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Pagination */}

@@ -24,8 +24,16 @@ export function RecommendationsSection({
   const [recommendations, setRecommendations] = useState<PropertyRecommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [recalculando, setRecalculando] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) {
+      setIsLoggedIn(false)
+      setLoading(false)
+      return
+    }
+    setIsLoggedIn(true)
     fetchRecommendations()
   }, [])
 
@@ -36,7 +44,6 @@ export function RecommendationsSection({
       setRecommendations(response.recommendations)
     } catch (error: any) {
       console.error("Error fetching recommendations:", error)
-      toast.error(error.message || "Error al cargar recomendaciones")
     } finally {
       setLoading(false)
     }
@@ -60,6 +67,10 @@ export function RecommendationsSection({
 
   const handleContact = (propertyId: number) => {
     window.location.href = `/propiedades/${propertyId}?contact=true`
+  }
+
+  if (!isLoggedIn) {
+    return null
   }
 
   if (loading) {

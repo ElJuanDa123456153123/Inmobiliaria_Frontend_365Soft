@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   User,
   Home,
@@ -26,6 +26,8 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
+  LayoutDashboard,
+  BarChart3,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -38,11 +40,13 @@ import { Loader2 } from "lucide-react"
 import { getImageUrl } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ExpiracionBadge } from "@/components/propiedades/ExpiracionBadge"
+import { VisitasTab } from "@/components/profile/visitas-tab"
 
-type TabType = 'resumen' | 'editar_perfil' | 'busquedas' | 'favoritos' | 'historial' | 'consultas' | 'suscripciones'
+type TabType = 'resumen' | 'editar_perfil' | 'busquedas' | 'favoritos' | 'historial' | 'consultas' | 'suscripciones' | 'visitas'
 
-export default function PerfilPage() {
+function PerfilContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -62,6 +66,8 @@ export default function PerfilPage() {
   const [payments, setPayments] = useState<QrPago[]>([])
   const [loadingSubscription, setLoadingSubscription] = useState(true)
   const [loadingPayments, setLoadingPayments] = useState(true)
+  const [hasActiveProperties, setHasActiveProperties] = useState(false)
+  const [activePropertiesCount, setActivePropertiesCount] = useState(0)
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -88,17 +94,31 @@ export default function PerfilPage() {
       try {
         const userData = await apiService.getProfile()
 
-        // Actualizar localStorage para mantener compatibilidad
-        localStorage.setItem("userName", `${userData.nombre} ${userData.apellido}`.trim())
-        localStorage.setItem("userEmail", userData.email)
-        localStorage.setItem("userRole", userData.rol)
+        console.log("🔍 fetchProfile - Datos recibidos:", userData)
+        console.log("🔍 fetchProfile - user:", userData.user)
+        console.log("🔍 fetchProfile - nombre:", userData.user?.nombre, "| apellido:", userData.user?.apellido)
 
-        setUser(userData)
+        // Actualizar localStorage para mantener compatibilidad
+        // Validar nombre y apellido antes de guardar para evitar "undefined undefined"
+        const nombre = userData.user?.nombre?.trim() || ""
+        const apellido = userData.user?.apellido?.trim() || ""
+        const nombreCompleto = apellido ? `${nombre} ${apellido}`.trim() : nombre
+
+        console.log("🔍 fetchProfile - Guardando en localStorage:", nombreCompleto)
+        console.log("🔍 fetchProfile - nombre:", nombre, "| apellido:", apellido, "| nombreCompleto:", nombreCompleto)
+
+        localStorage.setItem("userName", nombreCompleto)
+        localStorage.setItem("userEmail", userData.user?.email)
+        localStorage.setItem("userRole", userData.user?.rol)
+
+        console.log("✅ localStorage actualizado - userName:", localStorage.getItem("userName"))
+
+        setUser(userData.user)
 
         // Formatear fecha de nacimiento si existe
         let fechaNacimiento = ""
-        if (userData.fecha_nacimiento) {
-          const date = new Date(userData.fecha_nacimiento)
+        if (userData.user?.fecha_nacimiento) {
+          const date = new Date(userData.user.fecha_nacimiento)
           const anio = date.getFullYear()
           const mes = String(date.getMonth() + 1).padStart(2, '0')
           const dia = String(date.getDate()).padStart(2, '0')
@@ -106,14 +126,14 @@ export default function PerfilPage() {
         }
 
         setFormData({
-          nombre: userData.nombre || "",
-          apellido: userData.apellido || "",
-          email: userData.email || "",
-          telefono: userData.telefono || "",
+          nombre: userData.user?.nombre || "",
+          apellido: userData.user?.apellido || "",
+          email: userData.user?.email || "",
+          telefono: userData.user?.telefono || "",
           fecha_nacimiento: fechaNacimiento,
-          sexo: userData.sexo || "",
-          direccion: userData.direccion || "",
-          ci: userData.ci || "",
+          sexo: userData.user?.sexo || "",
+          direccion: userData.user?.direccion || "",
+          ci: userData.user?.ci || "",
           nueva_password: "",
           confirmar_password: ""
         })
@@ -129,6 +149,15 @@ export default function PerfilPage() {
     fetchProfile()
   }, [router])
 
+  // Leer ?tab= del URL (para venir desde email o notificacion)
+  useEffect(() => {
+    const tabParam = searchParams.get("tab")
+    if (tabParam === "visitas" || tabParam === "consultas" || tabParam === "historial" ||
+        tabParam === "suscripciones" || tabParam === "favoritos" || tabParam === "busquedas") {
+      setActiveTab(tabParam as TabType)
+    }
+  }, [searchParams])
+
   // Cargar propiedades del usuario
   useEffect(() => {
     const fetchProperties = async () => {
@@ -138,8 +167,8 @@ export default function PerfilPage() {
       try {
         const userProperties = await apiService.getMyProperties()
         console.log('Propiedades del usuario:', userProperties)
-        console.log('Cantidad de propiedades:', userProperties.length)
-        setProperties(userProperties)
+        console.log('Cantidad de propiedades:', userProperties.properties?.length)
+        setProperties(userProperties.properties || [])
       } catch (error) {
         console.error('Error cargando propiedades:', error)
       } finally {
@@ -148,6 +177,37 @@ export default function PerfilPage() {
     }
 
     fetchProperties()
+  }, [])
+
+  // Verificar si tiene propiedades activas para mostrar el Panel
+  useEffect(() => {
+    const checkActiveProperties = async () => {
+      const token = localStorage.getItem("token")
+      if (!token) return
+
+      try {
+        const response = await fetch("http://localhost:3001/api/panel/dashboard", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const count = data.propiedades_activas || 0
+          setActivePropertiesCount(count)
+          setHasActiveProperties(count > 0)
+        } else if (response.status === 403) {
+          setHasActiveProperties(false)
+          setActivePropertiesCount(0)
+        }
+      } catch (error) {
+        console.error("Error verificando propiedades activas:", error)
+        setHasActiveProperties(false)
+      }
+    }
+
+    checkActiveProperties()
   }, [])
 
   // Cargar propiedades favoritas del usuario
@@ -332,7 +392,11 @@ export default function PerfilPage() {
       setUser(response.user)
 
       // Actualizar localStorage
-      localStorage.setItem("userName", `${response.user.nombre} ${response.user.apellido}`.trim())
+      // Validar nombre y apellido antes de guardar para evitar "undefined undefined"
+      const nombre = response.user.nombre?.trim() || ""
+      const apellido = response.user.apellido?.trim() || ""
+      const nombreCompleto = apellido ? `${nombre} ${apellido}`.trim() : nombre
+      localStorage.setItem("userName", nombreCompleto)
       localStorage.setItem("userEmail", response.user.email)
 
       // Disparar evento para actualizar el header
@@ -361,6 +425,7 @@ export default function PerfilPage() {
     { id: 'suscripciones' as TabType, label: 'Suscripciones', icon: CreditCard },
     { id: 'historial' as TabType, label: 'Historial', icon: Clock },
     { id: 'consultas' as TabType, label: 'Consultas', icon: MessageCircle },
+    { id: 'visitas' as TabType, label: 'Visitas', icon: Calendar },
   ]
 
   const getFilterChips = (filtros: any) => {
@@ -423,7 +488,10 @@ export default function PerfilPage() {
     return null
   }
 
-  const nombreCompleto = `${user.nombre} ${user.apellido}`.trim()
+  // Validar nombre y apellido antes de mostrar para evitar "undefined undefined"
+  const nombreCompleto = user.apellido?.trim()
+    ? `${user.nombre || ''} ${user.apellido}`.trim()
+    : (user.nombre?.trim() || 'Usuario')
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -439,7 +507,7 @@ export default function PerfilPage() {
                   {/* Avatar con nombre */}
                   <div className="flex flex-col items-center mb-6 pb-6 border-b">
                     <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white text-2xl font-bold mb-3">
-                      {user.nombre.charAt(0).toUpperCase()}
+                      {(user.nombre?.trim() || user.apellido?.trim() || 'U').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-lg font-semibold text-gray-900">{nombreCompleto}</h2>
@@ -508,6 +576,61 @@ export default function PerfilPage() {
             <div className="lg:col-span-3">
               {activeTab === 'resumen' && (
                 <div className="space-y-8">
+                  {/* Panel de Gestión - Solo mostrar si tiene propiedades activas */}
+                  {hasActiveProperties && (
+                    <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <LayoutDashboard className="w-5 h-5 text-primary" />
+                            <span className="text-lg">Panel de Gestión</span>
+                          </div>
+                          <Badge className="bg-primary text-primary-foreground">
+                            {activePropertiesCount} {activePropertiesCount === 1 ? 'propiedad activa' : 'propiedades activas'}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <p className="text-muted-foreground">
+                            Gestiona tus propiedades, contactos, visitas y más desde el panel de control.
+                          </p>
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <Button
+                              onClick={() => router.push('/panel')}
+                              className="bg-primary hover:bg-primary/90 flex-1"
+                            >
+                              <LayoutDashboard className="w-4 h-4 mr-2" />
+                              Ir al Panel
+                            </Button>
+                            <Button
+                              onClick={() => router.push('/panel/reportes')}
+                              variant="outline"
+                              className="flex-1"
+                            >
+                              <BarChart3 className="w-4 h-4 mr-2" />
+                              Ver Reportes
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <MessageCircle className="w-4 h-4 text-primary" />
+                              <span className="text-muted-foreground">Contactos</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="w-4 h-4 text-primary" />
+                              <span className="text-muted-foreground">Visitas</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <TrendingUp className="w-4 h-4 text-primary" />
+                              <span className="text-muted-foreground">Estadísticas</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* Mis Propiedades */}
                   <Card>
                     <CardHeader>
@@ -602,7 +725,7 @@ export default function PerfilPage() {
                                                   ? 'bg-gray-100 text-gray-800'
                                                   : 'bg-yellow-100 text-yellow-800'
                                               }`}>
-                                                {property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)}
+                                                {property.estado_propiedad ? (property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)) : 'Pendiente'}
                                               </span>
                                             </div>
                                           </div>
@@ -1093,7 +1216,7 @@ export default function PerfilPage() {
                                               ? 'bg-gray-100 text-gray-800'
                                               : 'bg-yellow-100 text-yellow-800'
                                           }`}>
-                                            {property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)}
+                                            {property.estado_propiedad ? (property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)) : 'Pendiente'}
                                           </span>
                                         </div>
                                       </div>
@@ -1256,7 +1379,7 @@ export default function PerfilPage() {
                                                 ? 'bg-gray-100 text-gray-800'
                                                 : 'bg-yellow-100 text-yellow-800'
                                             }`}>
-                                              {property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)}
+                                              {property.estado_propiedad ? (property.estado_propiedad.charAt(0).toUpperCase() + property.estado_propiedad.slice(1)) : 'Pendiente'}
                                             </span>
                                           </div>
                                         </div>
@@ -1551,12 +1674,16 @@ export default function PerfilPage() {
                   <CardContent className="p-12 text-center">
                     <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">Mis Consultas</h3>
-                    <p className="text-muted-foreground mb-4">Todavía no tienes consultas</p>
+                    <p className="text-muted-foreground mb-4">Todavia no tienes consultas</p>
                     <p className="text-sm text-muted-foreground">
-                      Cuando consultes sobre una propiedad, aparecerá aquí
+                      Cuando consultes sobre una propiedad, aparecera aqui
                     </p>
                   </CardContent>
                 </Card>
+              )}
+
+              {activeTab === 'visitas' && (
+                <VisitasTab />
               )}
             </div>
           </div>
@@ -1565,5 +1692,17 @@ export default function PerfilPage() {
 
       <Footer />
     </div>
+  )
+}
+
+export default function PerfilPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <PerfilContent />
+    </Suspense>
   )
 }

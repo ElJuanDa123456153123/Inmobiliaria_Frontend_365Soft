@@ -1,10 +1,12 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Users, Building2, DollarSign, Eye, ShieldAlert, Award, TrendingUp, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Users, Building2, DollarSign, Eye, ShieldAlert, Award, TrendingUp, RefreshCw, UserCircle } from 'lucide-react'
 import StatCard from '@/components/admin/StatCard'
 import LineChart from '@/components/admin/LineChart'
 import BarChart from '@/components/admin/BarChart'
+import { adminApi } from '@/lib/services/admin-api'
 
 interface PropertyImage {
   id: number
@@ -50,16 +52,27 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
+  const router = useRouter()
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [propertiesWithoutAdvisor, setPropertiesWithoutAdvisor] = useState<number>(0)
+
+  const fetchPropertiesWithoutAdvisor = async () => {
+    try {
+      const result = await adminApi.getPropertiesWithoutAdvisorCount()
+      setPropertiesWithoutAdvisor(result.count)
+    } catch (err) {
+      console.error('Error fetching properties without advisor:', err)
+    }
+  }
 
   const fetchAnalytics = async () => {
     try {
       const token = localStorage.getItem("token")
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
-      
+
       const response = await fetch(`${apiUrl}/admin/analytics`, {
         headers: {
           "Authorization": `Bearer ${token}`
@@ -83,11 +96,13 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetchAnalytics()
+    fetchPropertiesWithoutAdvisor()
   }, [])
 
   const handleRefresh = () => {
     setRefreshing(true)
     fetchAnalytics()
+    fetchPropertiesWithoutAdvisor()
   }
 
   if (loading) {
@@ -192,6 +207,19 @@ export default function AnalyticsPage() {
           icon={DollarSign}
           description="Suscripciones y publicaciones (BOB)"
           trend={{ value: "+18.2%", isPositive: true }}
+        />
+      </div>
+
+      {/* Cards de Alertas y Acciones */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StatCard
+          title="Propiedades sin Asesor"
+          value={formatNumber(propertiesWithoutAdvisor)}
+          icon={UserCircle}
+          description="Requieren asignación de asesor"
+          trend={propertiesWithoutAdvisor > 0 ? { value: "Requiere atención", isPositive: false } : undefined}
+          onClick={() => router.push('/admin/propiedades?sin_asesor=true')}
+          clickable={true}
         />
       </div>
 

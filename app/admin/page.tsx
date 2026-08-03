@@ -186,22 +186,22 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Users Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse table-auto">
             <thead>
               <tr className="bg-muted/30 border-b border-border text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                <th className="px-6 py-4">ID</th>
-                <th className="px-6 py-4">Usuario</th>
-                <th className="px-6 py-4">Contacto</th>
-                <th className="px-6 py-4">Estado</th>
-                <th className="px-6 py-4">Registro</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-4 py-3">ID</th>
+                <th className="px-4 py-3">Usuario</th>
+                <th className="px-4 py-3">Contacto</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3">Registro</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-background">
               {currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-16 text-center">
+                  <td colSpan={6} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Shield className="h-10 w-10 mb-3 opacity-50" />
                       <p className="text-base font-medium">No se encontraron usuarios</p>
@@ -211,14 +211,14 @@ export default function AdminUsersPage() {
               ) : (
                 currentItems.map((user) => (
                   <tr key={user.id} className="hover:bg-primary/5 transition-colors group">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-muted-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-muted-foreground">
                       #{user.id}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
                           <span className="text-primary font-bold text-sm">
-                            {user.nombre.charAt(0).toUpperCase()}
+                            {user.nombre ? user.nombre.charAt(0).toUpperCase() : 'U'}
                           </span>
                         </div>
                         <div className="ml-4">
@@ -227,10 +227,10 @@ export default function AdminUsersPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
                       {user.telefono}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${
                         user.activo ? "bg-emerald-100 text-emerald-800" : "bg-destructive/10 text-destructive"
                       }`}>
@@ -242,10 +242,10 @@ export default function AdminUsersPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                       {new Date(user.created_at).toLocaleDateString("es-BO")}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                       <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="ghost"
@@ -274,6 +274,77 @@ export default function AdminUsersPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden space-y-4">
+          {currentItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Shield className="h-10 w-10 mb-3 opacity-50" />
+              <p className="text-base font-medium">No se encontraron usuarios</p>
+            </div>
+          ) : (
+            currentItems.map((user) => (
+              <div key={user.id} className="bg-background rounded-xl shadow-sm border border-border p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
+                    <span className="text-primary font-bold text-sm">
+                      {user.nombre ? user.nombre.charAt(0).toUpperCase() : 'U'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-foreground">{user.nombre}</div>
+                    <div className="text-xs text-muted-foreground">{user.email}</div>
+                    <div className="text-xs text-muted-foreground mt-1">#{user.id}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Teléfono:</span>
+                    <span className="ml-1 text-foreground">{user.telefono}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Registro:</span>
+                    <span className="ml-1 text-foreground">{new Date(user.created_at).toLocaleDateString("es-BO")}</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${
+                    user.activo ? "bg-emerald-100 text-emerald-800" : "bg-destructive/10 text-destructive"
+                  }`}>
+                    {user.activo ? "Activo" : "Inactivo"}
+                  </span>
+                  {user.verificado && (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-100 text-blue-800">
+                      Verificado
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleToggleActive(user.id)}
+                    className={user.activo ? "text-primary hover:text-primary/80" : "text-muted-foreground hover:text-foreground"}
+                    title={user.activo ? "Desactivar" : "Activar"}
+                  >
+                    <Shield className="h-4 w-4" />
+                  </Button>
+                  {user.id !== currentUserId && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteUser(user.id)}
+                      className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Pagination */}

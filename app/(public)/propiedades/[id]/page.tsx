@@ -1,25 +1,27 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Image from "next/image"
+import Link from "next/link"
 import {
   MapPin,
   Bed,
   Bath,
   Maximize,
   Calendar,
-  Heart,
   Share2,
   Phone,
-  Mail,
   Check,
   ChevronLeft,
   ChevronRight,
   Loader2,
   ExternalLink,
-  UserCog,
-  User,
+  MessageSquare,
+  X,
+  Send,
+  Image as ImageIcon,
+  Paperclip,
+  Download,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Header } from "@/components/layout/header"
@@ -29,6 +31,10 @@ import { toast } from "sonner"
 import { getImageUrl } from "@/lib/utils"
 import dynamic from "next/dynamic"
 import { FavoriteButton } from "@/components/ui/favorite-button"
+import DOMPurify from "dompurify"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+const WS_URL = API_URL.replace(/^http/, "ws")
 
 // Cargar el mapa de forma dinámica para evitar problemas de SSR
 const Mapa = dynamic(() => import("@/components/mapa/Mapa"), {
@@ -36,12 +42,450 @@ const Mapa = dynamic(() => import("@/components/mapa/Mapa"), {
   loading: () => <div className="w-full h-full bg-muted animate-pulse rounded-lg" />
 })
 
+interface ChatMessage {
+  id: number
+  de_user_id: number
+  para_user_id: number
+  mensaje: string
+  tipo_mensaje?: string
+  archivo_url?: string
+  archivo_nombre?: string
+  created_at?: string
+}
+
 export default function PropertyDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [property, setProperty] = useState<Property | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  // Estados para el modal de chat
+  const [modalChatAbierto, setModalChatAbierto] = useState(false)
+  const [chatVendedorId, setChatVendedorId] = useState<number | null>(null)
+  const [chatVendedorNombre, setChatVendedorNombre] = useState("")
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [nuevoMensaje, setNuevoMensaje] = useState("")
+  const [enviandoMensaje, setEnviandoMensaje] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [enviandoArchivo, setEnviandoArchivo] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [archivoPendiente, setArchivoPendiente] = useState<{ file: File; preview: string; isImage: boolean } | null>(null)
+  const [mensajeArchivo, setMensajeArchivo] = useState("")
+
+  // Estados para el modal de solicitud de visita
+  const [modalVisitaAbierto, setModalVisitaAbierto] = useState(false)
+  const [nombreVisita, setNombreVisita] = useState("")
+  const [telefonoVisita, setTelefonoVisita] = useState("")
+  const [horarioVisita, setHorarioVisita] = useState("")
+  const [enviandoVisita, setEnviandoVisita] = useState(false)
+
+  // Refs para usar dentro del WebSocket sin reconectar
+  const chatVendedorIdRef = useRef<number | null>(null)
+  const currentUserIdRef = useRef<number | null>(null)
+  const propertyIdRef = useRef<number | null>(null)
+
+  // Función para abrir modal de chat
+  const abrirModalChat = async (vendedorId: number, vendedorNombre: string, propertyId: number) => {
+    const token = localStorage.getItem("token")
+
+    if (!token) {
+      toast.error("Debes iniciar sesión para enviar mensajes")
+      router.push(`/ingresar?redirect=/propiedades/${params.id}`)
+      return
+    }
+
+    // Obtener ID del usuario actual primero para verificar si es el propio vendedor
+    let currentId: number | null = null
+    try {
+      const userResponse = await fetch(`${API_URL}/api/auth/me`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+
+      if (!userResponse.ok) {
+        toast.error("No se pudo verificar tu sesión. Inicia sesión nuevamente.")
+        router.push(`/ingresar?redirect=/propiedades/${params.id}`)
+        return
+      }
+
+      const userData = await userResponse.json()
+      currentId = userData.user?.id
+
+      if (!currentId) {
+        toast.error("No se pudo obtener tu información de usuario")
+        return
+      }
+
+      // Verificar si el usuario está intentando enviarse mensaje a sí mismo
+      if (currentId === vendedorId) {
+        toast.error("No puedes enviarte mensajes a ti mismo")
+        return
+      }
+    } catch (error) {
+      console.error("Error verificando usuario:", error)
+      toast.error("Error al verificar tu sesión")
+      return
+    }
+
+    // Abrir modal solo si tenemos el ID de usuario confirmado
+    setChatVendedorId(vendedorId)
+    setChatVendedorNombre(vendedorNombre)
+    setChatMessages([]) // Limpiar mensajes anteriores
+    setCurrentUserId(currentId)
+    setModalChatAbierto(true)
+
+    // Cargar mensajes existentes
+    try {
+      const response = await fetch(`${API_URL}/api/panel/messages/thread/${vendedorId}?property_id=${propertyId}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Validar que data.messages sea un array
+        if (Array.isArray(data.messages)) {
+          setChatMessages(data.messages.filter((m: ChatMessage) => m && m.id))
+        }
+      }
+    } catch (error) {
+      console.error("Error cargando mensajes:", error)
+      toast.error("Error al cargar mensajes")
+    }
+  }
+
+  // Función para enviar mensaje en el modal
+  const enviarMensajeChat = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!nuevoMensaje.trim() || !chatVendedorId || !property) {
+      toast.error("Faltan datos para enviar el mensaje")
+      return
+    }
+
+    setEnviandoMensaje(true)
+
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        toast.error("Debes iniciar sesión para enviar mensajes")
+        return
+      }
+
+      console.log("Enviando mensaje:", {
+        para_user_id: chatVendedorId,
+        property_id: property.id,
+        mensaje: nuevoMensaje.trim()
+      })
+
+      const response = await fetch(`${API_URL}/api/panel/messages/send`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          para_user_id: chatVendedorId,
+          property_id: property.id,
+          mensaje: nuevoMensaje.trim()
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("Mensaje enviado:", data)
+
+        // El backend devuelve "mensaje" (en español), no "message"
+        if (data.mensaje && data.mensaje.id) {
+          setChatMessages(prev => [...prev, data.mensaje])
+          setNuevoMensaje("")
+          toast.success("Mensaje enviado")
+        } else {
+          console.error("Estructura de respuesta inválida:", data)
+          toast.error("Error en la respuesta del servidor")
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Error desconocido" }))
+        console.error("Error del servidor:", errorData)
+        toast.error(`Error al enviar mensaje: ${errorData.error || response.statusText}`)
+      }
+    } catch (error) {
+      console.error("Error enviando mensaje:", error)
+      toast.error("Error al enviar mensaje")
+    } finally {
+      setEnviandoMensaje(false)
+    }
+  }
+
+  // Seleccionar archivo para previsualizar antes de enviar
+  const seleccionarArchivoChat = (file: File) => {
+    const isImage = file.type.startsWith("image/")
+    const preview = isImage ? URL.createObjectURL(file) : ""
+    setMensajeArchivo("")
+    setArchivoPendiente({ file, preview, isImage })
+  }
+
+  // Cancelar envío de archivo
+  const cancelarArchivoPendiente = () => {
+    if (archivoPendiente?.preview) {
+      URL.revokeObjectURL(archivoPendiente.preview)
+    }
+    setArchivoPendiente(null)
+    setMensajeArchivo("")
+  }
+
+  // Confirmar y enviar archivo
+  const confirmarArchivoChat = async () => {
+    if (!archivoPendiente || !chatVendedorId || !property) return
+
+    const { file } = archivoPendiente
+    setEnviandoArchivo(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        toast.error("Debes iniciar sesión para enviar archivos")
+        return
+      }
+
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const uploadResponse = await fetch(`${API_URL}/api/panel/messages/upload`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+        body: formData
+      })
+
+      if (!uploadResponse.ok) {
+        const errData = await uploadResponse.json().catch(() => ({ error: "Error al subir archivo" }))
+        toast.error(errData.error || "Error al subir archivo")
+        return
+      }
+
+      const uploadData = await uploadResponse.json()
+
+      const sendResponse = await fetch(`${API_URL}/api/panel/messages/send`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          para_user_id: chatVendedorId,
+          property_id: property.id,
+          mensaje: mensajeArchivo.trim() || file.name,
+          tipo_mensaje: uploadData.tipo_mensaje,
+          archivo_url: uploadData.url,
+          archivo_nombre: file.name
+        })
+      })
+
+      if (sendResponse.ok) {
+        const data = await sendResponse.json()
+        if (data.mensaje && data.mensaje.id) {
+          setChatMessages(prev => {
+            if (prev.some(m => m.id === data.mensaje.id)) return prev
+            return [...prev, data.mensaje]
+          })
+        }
+        setTimeout(() => {
+          const container = document.getElementById("chat-messages-container")
+          if (container) container.scrollTop = container.scrollHeight
+        }, 100)
+      }
+    } catch (error) {
+      console.error("Error subiendo archivo:", error)
+      toast.error("Error al subir archivo")
+    } finally {
+      setEnviandoArchivo(false)
+      cancelarArchivoPendiente()
+    }
+  }
+
+  // Función para iniciar conversación con el vendedor/asesor (MANTENIDA PARA COMPATIBILIDAD)
+  const iniciarConversacion = (vendedorId: number, propertyId: number) => {
+    abrirModalChat(vendedorId, property?.vendedor_nombre || "Vendedor", propertyId)
+  }
+
+  // Función para abrir modal de solicitud de visita
+  const abrirModalVisita = () => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      toast.error("Debes iniciar sesión para solicitar una visita")
+      router.push(`/ingresar?redirect=/propiedades/${params.id}`)
+      return
+    }
+    setModalVisitaAbierto(true)
+  }
+
+  // Función para enviar solicitud de visita
+  const handleSolicitarVisita = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!property) return
+    if (!nombreVisita.trim() || !telefonoVisita.trim() || !horarioVisita) {
+      toast.error("Por favor completa todos los campos")
+      return
+    }
+
+    setEnviandoVisita(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${API_URL}/api/panel/visits`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          property_id: property.id,
+          nombre_completo: nombreVisita,
+          telefono: telefonoVisita,
+          horario_preferido: horarioVisita
+        })
+      })
+
+      if (response.ok) {
+        toast.success("Solicitud de visita enviada correctamente")
+        setModalVisitaAbierto(false)
+        setNombreVisita("")
+        setTelefonoVisita("")
+        setHorarioVisita("")
+      } else {
+        const errData = await response.json().catch(() => ({ error: "Error al enviar solicitud" }))
+        toast.error(errData.error || "Error al enviar solicitud")
+      }
+    } catch (error) {
+      console.error("Error solicitando visita:", error)
+      toast.error("Error al enviar solicitud de visita")
+    } finally {
+      setEnviandoVisita(false)
+    }
+  }
+
+  // Función para parsear mensajes especiales (solicitud de visita)
+  const parseMensajeEspecial = (mensaje: string) => {
+    try {
+      const data = JSON.parse(mensaje)
+      if (data && typeof data === "object" && data.type) {
+        return data
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  // WebSocket para recibir mensajes en tiempo real en el modal de chat
+  useEffect(() => {
+    chatVendedorIdRef.current = chatVendedorId
+  }, [chatVendedorId])
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId
+  }, [currentUserId])
+
+  useEffect(() => {
+    propertyIdRef.current = property?.id ?? null
+  }, [property])
+
+  useEffect(() => {
+    if (!modalChatAbierto || !chatVendedorId || !currentUserId) {
+      return
+    }
+
+    const token = localStorage.getItem("token")
+    if (!token) {
+      return
+    }
+
+    let reconnectTimeout: ReturnType<typeof setTimeout>
+    let isMounted = true
+    let reconnectAttempts = 0
+    const MAX_RECONNECT_ATTEMPTS = 10
+
+    const connect = () => {
+      console.log("🔌 Conectando WebSocket para modal de chat...")
+      const ws = new WebSocket(`${WS_URL}/ws?token=${token}`)
+
+      ws.onopen = () => {
+        console.log("✅ WebSocket conectado para modal de chat")
+        reconnectAttempts = 0
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+
+          if (data.type === "new_message" || data.type === "message_sent") {
+            const mensaje = data.message?.message
+            if (!mensaje) return
+
+            const vendedorId = chatVendedorIdRef.current
+            const userId = currentUserIdRef.current
+            const propId = propertyIdRef.current
+
+            // Verificar si el mensaje es de/para el vendedor con el que estamos chateando
+            const esDeLaConversacion = (mensaje.de_user_id === vendedorId && mensaje.para_user_id === userId) ||
+              (mensaje.de_user_id === userId && mensaje.para_user_id === vendedorId)
+            const esDeLaPropiedad = !mensaje.property_id || mensaje.property_id === propId
+
+            if (esDeLaConversacion && esDeLaPropiedad) {
+              setChatMessages(prev => {
+                if (prev.some(m => m.id === mensaje.id)) {
+                  return prev
+                }
+                return [...prev, mensaje]
+              })
+              setTimeout(() => {
+                const messagesContainer = document.getElementById("chat-messages-container")
+                if (messagesContainer) {
+                  messagesContainer.scrollTop = messagesContainer.scrollHeight
+                }
+              }, 100)
+            }
+          }
+        } catch (err) {
+          console.error("Error procesando mensaje WebSocket:", err)
+        }
+      }
+
+      ws.onerror = (error) => {
+        console.error("❌ WebSocket error en modal:", error)
+      }
+
+      ws.onclose = (event) => {
+        console.log("🔌 WebSocket desconectado en modal:", event.code, event.reason)
+        if (isMounted && event.code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000)
+          reconnectAttempts++
+          console.log(`🔌 Reconectando WebSocket en ${delay / 1000}s (intento ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`)
+          reconnectTimeout = setTimeout(() => {
+            connect()
+          }, delay)
+        }
+      }
+
+      return ws
+    }
+
+    const ws = connect()
+
+    return () => {
+      isMounted = false
+      clearTimeout(reconnectTimeout)
+      if (ws) {
+        ws.close()
+      }
+    }
+  }, [modalChatAbierto, chatVendedorId, currentUserId])
 
   // Cargar propiedad desde el backend
   useEffect(() => {
@@ -142,9 +586,9 @@ export default function PropertyDetailPage() {
         <div className="bg-muted/30 border-b border-border">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
             <nav className="flex items-center text-sm text-muted-foreground">
-              <a href="/" className="hover:text-foreground">Inicio</a>
+              <Link href="/" className="hover:text-foreground">Inicio</Link>
               <span className="mx-2">/</span>
-              <a href="/propiedades" className="hover:text-foreground">Propiedades</a>
+              <Link href="/propiedades" className="hover:text-foreground">Propiedades</Link>
               <span className="mx-2">/</span>
               <span className="text-foreground">{property.titulo}</span>
             </nav>
@@ -276,7 +720,7 @@ export default function PropertyDetailPage() {
                   <h2 className="text-xl font-semibold mb-4">Descripción</h2>
                   <div
                     className="text-muted-foreground leading-relaxed [&_p]:mb-4 [&_p]:last:mb-0"
-                    dangerouslySetInnerHTML={{ __html: property.descripcion }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.descripcion) }}
                   />
                 </div>
 
@@ -385,7 +829,7 @@ export default function PropertyDetailPage() {
               {/* Sidebar - Contact Card */}
               <div className="lg:col-span-1">
                 <div className="sticky top-4 space-y-6">
-                  {/* Asesores Asignados - Prioridad sobre vendedor */}
+                  {/* Asesores Asignados - COMENTADO TEMPORALMENTE - Enviar siempre al dueño
                   {property.asesores_asignados && property.asesores_asignados.length > 0 ? (
                     <div className="bg-card rounded-xl p-6 shadow-lg border border-border">
                       <h3 className="font-semibold text-lg mb-4">Contactar Asesor</h3>
@@ -397,11 +841,9 @@ export default function PropertyDetailPage() {
 
                           return (
                             <div key={asignacion.id} className="space-y-4">
-                              {/* Info del asesor */}
                               <div
                                 className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg border border-border"
                               >
-                                {/* Foto del asesor */}
                                 {asesor.avatar_url || asesor.imagen_url ? (
                                   <img
                                     src={getImageUrl(asesor.avatar_url || asesor.imagen_url) || asesor.avatar_url || asesor.imagen_url}
@@ -410,11 +852,10 @@ export default function PropertyDetailPage() {
                                   />
                                 ) : (
                                   <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 text-white text-xl font-bold">
-                                    {asesor.nombre.charAt(0).toUpperCase()}
+                                    {asesor.nombre ? asesor.nombre.charAt(0).toUpperCase() : 'A'}
                                   </div>
                                 )}
 
-                                {/* Información del asesor */}
                                 <div className="flex-1 min-w-0">
                                   <p className="font-semibold text-base">{asesor.nombre}</p>
                                   <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
@@ -433,7 +874,6 @@ export default function PropertyDetailPage() {
                                 </div>
                               </div>
 
-                              {/* Botones de contacto */}
                               <div className="space-y-3">
                                 {asesor.telefono && (
                                   <Button className="w-full" size="lg" asChild>
@@ -444,11 +884,14 @@ export default function PropertyDetailPage() {
                                   </Button>
                                 )}
                                 {asesor.email && (
-                                  <Button className="w-full" variant="outline" size="lg" asChild>
-                                    <a href={`mailto:${asesor.email}`}>
-                                      <Mail className="h-4 w-4 mr-2" />
-                                      Enviar mensaje
-                                    </a>
+                                  <Button
+                                    className="w-full"
+                                    variant="outline"
+                                    size="lg"
+                                    onClick={() => iniciarConversacion(asesor.id, property.id)}
+                                  >
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    Enviar mensaje
                                   </Button>
                                 )}
                                 <Button className="w-full" variant="outline" size="lg">
@@ -459,7 +902,6 @@ export default function PropertyDetailPage() {
                                 </Button>
                               </div>
 
-                              {/* Info adicional */}
                               {(asesor.telefono || asesor.email) && (
                                 <div className="pt-4 border-t border-border space-y-2 text-sm">
                                   {asesor.telefono && (
@@ -481,14 +923,13 @@ export default function PropertyDetailPage() {
                         })}
                       </div>
                     </div>
-                  ) : (
-                    /* Agent Card - Solo si no hay asesores asignados */
+                  ) : */}
                     <div className="bg-card rounded-xl p-6 shadow-lg border border-border">
-                      <h3 className="font-semibold text-lg mb-4">Contactar Vendedor</h3>
+                      <h3 className="font-semibold text-lg mb-4">Contactar Dueño</h3>
 
                       <div className="flex items-center gap-4 mb-6">
                         <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white text-2xl font-bold">
-                          {property.vendedor_nombre.charAt(0)}
+                          {property.vendedor_nombre ? property.vendedor_nombre.charAt(0) : 'V'}
                         </div>
                         <div>
                           <div className="font-semibold">{property.vendedor_nombre}</div>
@@ -508,13 +949,25 @@ export default function PropertyDetailPage() {
                           </Button>
                         )}
                         {property.vendedor_email && (
-                          <Button className="w-full" variant="outline" size="lg" asChild>
-                            <a href={`mailto:${property.vendedor_email}`}>
-                              <Mail className="h-4 w-4 mr-2" />
-                              Enviar mensaje
-                            </a>
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            size="lg"
+                            onClick={() => iniciarConversacion(property.user_id, property.id)}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Enviar mensaje
                           </Button>
                         )}
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          size="lg"
+                          onClick={abrirModalVisita}
+                        >
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Solicitar Visita
+                        </Button>
                         <Button className="w-full" variant="outline" size="lg">
                           <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -538,7 +991,6 @@ export default function PropertyDetailPage() {
                         )}
                       </div>
                     </div>
-                  )}
 
                   {/* Publication Date */}
                   {property.fecha_publicacion && (
@@ -557,6 +1009,382 @@ export default function PropertyDetailPage() {
       </main>
 
       <Footer />
+
+      {/* Modal de Chat Emergente */}
+      {modalChatAbierto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+            {/* Header del modal */}
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-lg">
+              <div>
+                <h3 className="font-semibold text-gray-900">Chat con {chatVendedorNombre}</h3>
+                {property && (
+                  <p className="text-sm text-gray-600">{property.titulo}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setModalChatAbierto(false)}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Mensajes */}
+            <div id="chat-messages-container" className="flex-1 overflow-y-auto p-4 space-y-3">
+              {chatMessages.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  <p>No hay mensajes aún</p>
+                  <p className="text-sm mt-1">¡Sé el primero en saludar!</p>
+                </div>
+              ) : (
+                chatMessages.map((message, index) => {
+                  // Validar que el mensaje tenga las propiedades necesarias
+                  if (!message || !message.id) {
+                    console.error("Mensaje inválido:", message)
+                    return null
+                  }
+
+                  const isFromMe = message.de_user_id === currentUserId
+                  const mensajeEspecial = parseMensajeEspecial(message.mensaje || "")
+                  const esVisitRequest = mensajeEspecial?.type === "VISIT_REQUEST"
+
+                  return (
+                    <div
+                      key={message.id || index}
+                      className={`flex ${isFromMe ? "justify-end" : "justify-start"}`}
+                    >
+                      <div className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                        isFromMe
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 text-gray-900"
+                      }`}>
+                        {esVisitRequest ? (
+                          <div className="space-y-2">
+                            <div className="border-b border-gray-300/30 pb-2">
+                              <p className="text-sm font-semibold flex items-center gap-1">
+                                📅 {isFromMe ? "Solicitud de Visita Enviada" : "Solicitud de Visita"}
+                              </p>
+                            </div>
+                            <div className="space-y-1 text-sm">
+                              <p><strong>Cliente:</strong> {mensajeEspecial.cliente_nombre}</p>
+                              <p><strong>Teléfono:</strong> {mensajeEspecial.cliente_telefono}</p>
+                              <p><strong>Horario preferido:</strong> {mensajeEspecial.horario_preferido}</p>
+                            </div>
+                            {message.created_at && (
+                              <p className={`text-xs ${isFromMe ? "text-blue-200" : "text-gray-500"}`}>
+                                {new Date(message.created_at).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                        ) : message.tipo_mensaje === "imagen" && message.archivo_url ? (
+                          <div className="space-y-2">
+                            <a
+                              href={message.archivo_url.startsWith("http") ? message.archivo_url : `${API_URL}${message.archivo_url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <img
+                                src={message.archivo_url.startsWith("http") ? message.archivo_url : `${API_URL}${message.archivo_url}`}
+                                alt={message.archivo_nombre || "Imagen"}
+                                className="rounded-lg max-w-full max-h-60 object-cover"
+                              />
+                            </a>
+                            {message.mensaje && message.mensaje !== message.archivo_nombre && (
+                              <p className="text-sm">{message.mensaje}</p>
+                            )}
+                            {message.created_at && (
+                              <p className={`text-xs mt-1 ${isFromMe ? "text-blue-200" : "text-gray-500"}`}>
+                                {new Date(message.created_at).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                        ) : message.tipo_mensaje === "documento" && message.archivo_url ? (
+                          <div className="space-y-2">
+                            <a
+                              href={message.archivo_url.startsWith("http") ? message.archivo_url : `${API_URL}${message.archivo_url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-2 p-2 rounded-lg ${
+                                isFromMe ? "bg-blue-500/30 hover:bg-blue-500/50" : "bg-gray-200 hover:bg-gray-300"
+                              } transition-colors`}
+                            >
+                              <Paperclip className="h-5 w-5 shrink-0" />
+                              <span className="text-sm truncate flex-1">{message.archivo_nombre || "Documento"}</span>
+                              <Download className="h-4 w-4 shrink-0" />
+                            </a>
+                            {message.mensaje && message.mensaje !== message.archivo_nombre && (
+                              <p className="text-sm">{message.mensaje}</p>
+                            )}
+                            {message.created_at && (
+                              <p className={`text-xs mt-1 ${isFromMe ? "text-blue-200" : "text-gray-500"}`}>
+                                {new Date(message.created_at).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm">{message.mensaje || "Mensaje sin texto"}</p>
+                            {message.created_at && (
+                              <p className={`text-xs mt-1 ${
+                                isFromMe ? "text-blue-200" : "text-gray-500"
+                              }`}>
+                                {new Date(message.created_at).toLocaleTimeString('es-BO', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Input de mensaje */}
+            <form onSubmit={enviarMensajeChat} className="p-4 border-t border-gray-200">
+              <div className="flex gap-2 items-center">
+                {/* Botón subir imagen */}
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) seleccionarArchivoChat(file)
+                    e.target.value = ""
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={enviandoArchivo || enviandoMensaje}
+                  title="Enviar imagen"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
+
+                {/* Botón subir documento */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) seleccionarArchivoChat(file)
+                    e.target.value = ""
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={enviandoArchivo || enviandoMensaje}
+                  title="Enviar documento"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+
+                <input
+                  type="text"
+                  value={nuevoMensaje}
+                  onChange={(e) => setNuevoMensaje(e.target.value)}
+                  placeholder={enviandoArchivo ? "Subiendo archivo..." : "Escribe un mensaje..."}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={enviandoMensaje || enviandoArchivo}
+                />
+                <Button
+                  type="submit"
+                  disabled={!nuevoMensaje.trim() || enviandoMensaje || enviandoArchivo}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {enviandoMensaje ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Previsualización de Archivo */}
+      {archivoPendiente && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                Enviar archivo
+              </h3>
+
+              {/* Previsualización */}
+              <div className="mb-4">
+                {archivoPendiente.isImage ? (
+                  <img
+                    src={archivoPendiente.preview}
+                    alt="Preview"
+                    className="w-full max-h-64 object-contain rounded-lg border border-gray-200"
+                  />
+                ) : (
+                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <Paperclip className="h-10 w-10 text-gray-400" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {archivoPendiente.file.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {(archivoPendiente.file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Mensaje opcional */}
+              <input
+                type="text"
+                value={mensajeArchivo}
+                onChange={(e) => setMensajeArchivo(e.target.value)}
+                placeholder="Agregar un mensaje (opcional)..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              />
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={cancelarArchivoPendiente}
+                  disabled={enviandoArchivo}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={confirmarArchivoChat}
+                  disabled={enviandoArchivo}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  {enviandoArchivo ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Enviar"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Solicitud de Visita */}
+      {modalVisitaAbierto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Solicitar Visita
+                </h3>
+                <button
+                  onClick={() => setModalVisitaAbierto(false)}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {property && (
+                <p className="text-sm text-gray-600 mb-4">
+                  Propiedad: <strong>{property.titulo}</strong>
+                </p>
+              )}
+
+              <form onSubmit={handleSolicitarVisita} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tu nombre completo *
+                  </label>
+                  <input
+                    type="text"
+                    value={nombreVisita}
+                    onChange={(e) => setNombreVisita(e.target.value)}
+                    placeholder="Juan Pérez"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tu teléfono *
+                  </label>
+                  <input
+                    type="tel"
+                    value={telefonoVisita}
+                    onChange={(e) => setTelefonoVisita(e.target.value)}
+                    placeholder="77712345"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Horario preferido *
+                  </label>
+                  <select
+                    value={horarioVisita}
+                    onChange={(e) => setHorarioVisita(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Selecciona un horario</option>
+                    <option value="Mañana (9:00 - 12:00)">Mañana (9:00 - 12:00)</option>
+                    <option value="Tarde (14:00 - 18:00)">Tarde (14:00 - 18:00)</option>
+                    <option value="Sábado">Sábado</option>
+                    <option value="Domingo">Domingo</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setModalVisitaAbierto(false)}
+                    disabled={enviandoVisita}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={enviandoVisita}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  >
+                    {enviandoVisita ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Enviar Solicitud"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

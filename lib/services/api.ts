@@ -211,7 +211,7 @@ class ApiService {
   }
 
   // Obtener perfil del usuario actual
-  async getProfile(): Promise<UserProfile> {
+  async getProfile(): Promise<{ user: UserProfile }> {
     const response = await fetch(`${getApiUrl()}/api/auth/me`, {
       headers: this.getHeaders(),
     })
@@ -408,7 +408,7 @@ class ApiService {
   }
 
   // Obtener propiedades del usuario actual
-  async getMyProperties(): Promise<Property[]> {
+  async getMyProperties(): Promise<{ properties: Property[], total: number }> {
     const response = await fetch(`${getApiUrl()}/api/properties/my`, {
       headers: this.getHeaders(),
     })
@@ -823,6 +823,7 @@ interface Notification {
   titulo: string
   mensaje: string
   is_read: boolean
+  metadata?: string
   saved_search_id?: number
   saved_search?: SavedSearch
   property_id?: number

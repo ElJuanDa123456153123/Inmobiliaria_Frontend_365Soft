@@ -105,6 +105,7 @@ export interface AdminPropertyListParams {
   user_id?: number
   advisor_id?: number | string
   search?: string
+  sin_asesor?: string
 }
 
 export interface CreatePropertyRequest {
@@ -259,6 +260,7 @@ class AdminApiService {
     if (params?.user_id) queryParams.append('user_id', params.user_id.toString())
     if (params?.advisor_id && params.advisor_id !== '') queryParams.append('advisor_id', params.advisor_id.toString())
     if (params?.search) queryParams.append('search', params.search)
+    if (params?.sin_asesor) queryParams.append('sin_asesor', params.sin_asesor)
 
     const response = await fetch(`${getAdminApiUrl()}/properties?${queryParams}`, {
       headers: this.getHeaders(),
@@ -340,6 +342,14 @@ class AdminApiService {
     })
 
     return this.handleResponse<PropertiesStatsResponse>(response)
+  }
+
+  async getPropertiesWithoutAdvisorCount(): Promise<{ count: number }> {
+    const response = await fetch(`${getAdminApiUrl()}/properties/without-advisor-count`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse<{ count: number }>(response)
   }
 
   // ==================== ASESORES ====================
