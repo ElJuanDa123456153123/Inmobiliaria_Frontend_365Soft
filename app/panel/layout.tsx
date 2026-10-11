@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { Home, Building, MessageSquare, Calendar, CreditCard, BarChart3, LogOut, Menu, X, ChevronLeft, ChevronRight, Send } from "lucide-react"
+import { Home, Building, MessageSquare, Calendar, CreditCard, BarChart3, LogOut, Menu, X, ChevronLeft, ChevronRight, Send, BellRing, Users } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 
@@ -92,6 +92,8 @@ export default function PanelLayout({
   const menuItems = [
     { icon: Home, label: "Dashboard", path: "/panel" },
     { icon: Building, label: "Propiedades", path: "/panel/propiedades" },
+    { icon: BellRing, label: "Solicitudes", path: "/panel/solicitudes" },
+    { icon: Users, label: "Mis Inquilinos", path: "/panel/inquilinos" },
     { icon: MessageSquare, label: "Contactos", path: "/panel/contactos" },
     { icon: Send, label: "Mensajes", path: "/panel/mensajes" },
     { icon: Calendar, label: "Visitas", path: "/panel/visitas" },

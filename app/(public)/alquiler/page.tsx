@@ -47,6 +47,7 @@ export default function AlquilerPage() {
       : "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=600&fit=crop",
     publishedDate: property.fecha_publicacion ? new Date(property.fecha_publicacion).toLocaleDateString() : undefined,
     featured: property.destacado,
+    alquilada: property.alquilada,
     description: property.descripcion,
     agentName: property.vendedor_contacto || property.vendedor_nombre,
     agencyName: property.vendedor_nombre,

@@ -137,6 +137,7 @@ export function FeaturedProperties() {
       image: imageUrl,
       publishedDate: property.fecha_publicacion ? getTimeAgo(property.fecha_publicacion) : 'Reciente',
       featured: property.destacado,
+    alquilada: property.alquilada,
       description: property.descripcion,
       agentName: nombreVendedor,
       agencyName: nombreAgencia,

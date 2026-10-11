@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { Users, LogOut, Settings, Key, User, Building, UserCog, Layers, Globe, BarChart3, Users2, Award, FileText, ChevronLeft, ChevronRight, Menu, TrendingUp } from "lucide-react"
+import { Users, LogOut, Settings, Key, User, Building, UserCog, Layers, Globe, BarChart3, Users2, Award, FileText, ChevronLeft, ChevronRight, Menu, TrendingUp, MessageCircle, CalendarClock } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { AdminThemeProvider } from "@/components/admin/admin-theme-provider"
@@ -141,6 +141,8 @@ export default function AdminLayout({
     { href: "/admin/documentos", icon: FileText, label: "Documentos", show: true },
     { href: "/admin/crm/clientes", icon: Users2, label: "CRM de Clientes", show: true },
     { href: "/admin/crm/top-leads", icon: Award, label: "Top Leads", show: true },
+    { href: "/admin/whatsapp/leads", icon: MessageCircle, label: "Leads WhatsApp", show: true },
+    { href: "/admin/whatsapp/visitas", icon: CalendarClock, label: "Agenda WhatsApp", show: true },
     { href: "/admin/asesores", icon: UserCog, label: "Asesores", show: isAdmin },
     { href: "/admin/accesos", icon: Key, label: "Gestión de Accesos", show: isAdmin },
     { href: "/admin/planes", icon: Layers, label: "Planes de Suscripción", show: isAdmin },

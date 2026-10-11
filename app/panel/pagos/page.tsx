@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CreditCard, Calendar, Building, Download, AlertCircle, CheckCircle } from "lucide-react"
+import { CreditCard, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
@@ -9,16 +9,22 @@ import Link from "next/link"
 interface Payment {
   id: number
   monto: number
-  metodo_pago: string
-  estado: string
-  comprobante_url?: string
+  moneda: string
+  estado: string // PENDIENTE, PAGADO, CANCELADO, EXPIRADO
   created_at: string
+  fecha_proceso?: string
+  fecha_vencimiento: string
+  alias: string
+  property?: {
+    id: number
+    titulo: string
+  } | null
   plan?: {
     id: number
     nombre: string
     precio: number
     duracion_dias: number
-  }
+  } | null
 }
 
 export default function PanelPagosPage() {
@@ -32,7 +38,8 @@ export default function PanelPagosPage() {
   const fetchPayments = async () => {
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:3001/api/payments/my", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+      const response = await fetch(`${apiUrl}/api/payments/my`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -55,10 +62,10 @@ export default function PanelPagosPage() {
         return <Badge className="bg-green-500">Pagado</Badge>
       case "PENDIENTE":
         return <Badge className="bg-yellow-500">Pendiente</Badge>
-      case "RECHAZADO":
-        return <Badge className="bg-red-500">Rechazado</Badge>
-      case "EN_PROCESO":
-        return <Badge className="bg-blue-500">En Proceso</Badge>
+      case "CANCELADO":
+        return <Badge className="bg-gray-500">Cancelado</Badge>
+      case "EXPIRADO":
+        return <Badge className="bg-red-500">Expirado</Badge>
       default:
         return <Badge>{estado}</Badge>
     }
@@ -114,6 +121,9 @@ export default function PanelPagosPage() {
                     Plan
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Propiedad
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Monto
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -123,7 +133,7 @@ export default function PanelPagosPage() {
                     Estado
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Comprobante
+                    Fecha de pago
                   </th>
                 </tr>
               </thead>
@@ -143,27 +153,25 @@ export default function PanelPagosPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {payment.plan?.nombre || "Publicación"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      Bs. {payment.monto.toLocaleString()}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 max-w-[200px] truncate">
+                      {payment.property?.titulo || "-"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 capitalize">
-                      {payment.metodo_pago || "QR"}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {payment.moneda === "USD" ? "$" : "Bs. "}{payment.monto.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      QR Bancario
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getEstadoBadge(payment.estado)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {payment.comprobante_url ? (
-                        <Button variant="outline" size="sm" asChild>
-                          <a
-                            href={payment.comprobante_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Ver
-                          </a>
-                        </Button>
+                      {payment.fecha_proceso ? (
+                        new Date(payment.fecha_proceso).toLocaleDateString("es-ES", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}

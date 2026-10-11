@@ -81,6 +81,13 @@ export default function PropertyDetailPage() {
   const [horarioVisita, setHorarioVisita] = useState("")
   const [enviandoVisita, setEnviandoVisita] = useState(false)
 
+  // Estados para el modal de solicitud de alquiler
+  const [modalAlquilerAbierto, setModalAlquilerAbierto] = useState(false)
+  const [mensajeAlquiler, setMensajeAlquiler] = useState("")
+  const [telefonoAlquiler, setTelefonoAlquiler] = useState("")
+  const [enviandoAlquiler, setEnviandoAlquiler] = useState(false)
+  const [yaSolicito, setYaSolicito] = useState(false)
+
   // Refs para usar dentro del WebSocket sin reconectar
   const chatVendedorIdRef = useRef<number | null>(null)
   const currentUserIdRef = useRef<number | null>(null)
@@ -369,6 +376,93 @@ export default function PropertyDetailPage() {
       setEnviandoVisita(false)
     }
   }
+
+  // Función para abrir modal de solicitud de alquiler
+  const abrirModalAlquiler = () => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      toast.error("Debes iniciar sesión para solicitar el alquiler")
+      router.push(`/ingresar?redirect=/propiedades/${params.id}`)
+      return
+    }
+    setModalAlquilerAbierto(true)
+  }
+
+  // Función para enviar solicitud de alquiler
+  const handleSolicitarAlquiler = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!property) return
+    if (!telefonoAlquiler.trim()) {
+      toast.error("Por favor ingresa tu teléfono de contacto")
+      return
+    }
+
+    setEnviandoAlquiler(true)
+
+    try {
+      await apiService.solicitarAlquiler(property.id, {
+        mensaje: mensajeAlquiler.trim() || undefined,
+        telefono_contacto: telefonoAlquiler.trim(),
+      })
+      toast.success("Solicitud enviada. El propietario será notificado")
+      setModalAlquilerAbierto(false)
+      setMensajeAlquiler("")
+      setTelefonoAlquiler("")
+      setYaSolicito(true)
+    } catch (error) {
+      console.error("Error solicitando alquiler:", error)
+      toast.error(error instanceof Error ? error.message : "Error al enviar la solicitud")
+    } finally {
+      setEnviandoAlquiler(false)
+    }
+  }
+
+  // Verificar usuario actual y si ya tiene una solicitud pendiente en esta propiedad
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (!token) return
+
+    const checkUser = async () => {
+      try {
+        const userResponse = await fetch(`${API_URL}/api/auth/me`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        })
+        if (!userResponse.ok) return
+        const userData = await userResponse.json()
+        setCurrentUserId(userData.user?.id || null)
+      } catch {
+        // silencioso
+      }
+
+      try {
+        const data = await apiService.getSolicitudesEnviadas("pendiente")
+        if (data.solicitudes?.some((s) => String(s.property_id) === String(params.id))) {
+          setYaSolicito(true)
+        }
+      } catch {
+        // silencioso
+      }
+    }
+
+    checkUser()
+  }, [params.id])
+
+  // Determinar si el botón de solicitar (alquiler o anticrético) debe mostrarse
+  const esPropiedadAlquilable = Boolean(
+    property &&
+    (property.tipo_operacion === 'alquiler' || property.tipo_operacion === 'anticretico')
+  )
+  const mostrarBotonAlquiler = Boolean(
+    property &&
+    esPropiedadAlquilable &&
+    property.estado_propiedad === 'activo' &&
+    !property.alquilada &&
+    currentUserId !== null &&
+    currentUserId !== property.user_id &&
+    !yaSolicito
+  )
+  const esAnticretico = property?.tipo_operacion === 'anticretico'
 
   // Función para parsear mensajes especiales (solicitud de visita)
   const parseMensajeEspecial = (mensaje: string) => {
@@ -674,9 +768,16 @@ export default function PropertyDetailPage() {
                 <div>
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">
-                        {property.titulo}
-                      </h1>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h1 className="text-3xl font-bold text-foreground mb-2">
+                          {property.titulo}
+                        </h1>
+                        {property.alquilada && (
+                          <span className="mb-2 inline-flex items-center rounded-full bg-indigo-100 text-indigo-700 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                            Alquilada
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <MapPin className="h-4 w-4" />
                         <span>{property.zona}</span>
@@ -723,6 +824,59 @@ export default function PropertyDetailPage() {
                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.descripcion) }}
                   />
                 </div>
+
+                {/* Condiciones de alquiler / anticrético */}
+                {property.tipo_operacion === 'alquiler' && (property.deposito || property.plazo_minimo || (property.servicios_incluidos && property.servicios_incluidos.length > 0)) && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4">Condiciones de alquiler</h2>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {property.deposito && (
+                        <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                          <span className="text-muted-foreground">Depósito de garantía</span>
+                          <span className="font-semibold capitalize">{property.deposito}</span>
+                        </div>
+                      )}
+                      {property.plazo_minimo && (
+                        <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                          <span className="text-muted-foreground">Plazo mínimo</span>
+                          <span className="font-semibold capitalize">{property.plazo_minimo}</span>
+                        </div>
+                      )}
+                      {property.servicios_incluidos && property.servicios_incluidos.length > 0 && (
+                        <div className="sm:col-span-2">
+                          <p className="text-sm text-muted-foreground mb-2">Servicios incluidos</p>
+                          <div className="flex flex-wrap gap-2">
+                            {property.servicios_incluidos.map((servicio, index) => (
+                              <span key={index} className="inline-flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 rounded-full px-3 py-1 text-sm capitalize">
+                                <Check className="h-3.5 w-3.5" />
+                                {servicio.replace(/-/g, ' ')}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Condiciones del anticrético */}
+                {property.tipo_operacion === 'anticretico' && (property.duracion_contrato || property.opcion_compra) && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4">Condiciones del anticrético</h2>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {property.duracion_contrato && (
+                        <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                          <span className="text-muted-foreground">Duración del contrato</span>
+                          <span className="font-semibold capitalize">{property.duracion_contrato}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border">
+                        <span className="text-muted-foreground">Opción de compra</span>
+                        <span className="font-semibold">{property.opcion_compra ? "Sí" : "No"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Confort y Seguridad */}
                 {property.confort && Array.isArray(property.confort) && property.confort.length > 0 && (
@@ -940,6 +1094,17 @@ export default function PropertyDetailPage() {
                       </div>
 
                       <div className="space-y-3">
+                        {mostrarBotonAlquiler && (
+                          <Button className="w-full bg-indigo-600 hover:bg-indigo-700" size="lg" onClick={abrirModalAlquiler}>
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            {esAnticretico ? "Solicitar Anticrético" : "Solicitar Alquiler"}
+                          </Button>
+                        )}
+                        {yaSolicito && esPropiedadAlquilable && !property.alquilada && (
+                          <div className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-center font-medium">
+                            Solicitud de alquiler enviada. El propietario la revisará pronto.
+                          </div>
+                        )}
                         {property.vendedor_telefono && (
                           <Button className="w-full" size="lg" asChild>
                             <a href={`tel:${property.vendedor_telefono}`}>
@@ -1374,6 +1539,95 @@ export default function PropertyDetailPage() {
                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                   >
                     {enviandoVisita ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Enviar Solicitud"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Solicitud de Alquiler */}
+      {modalAlquilerAbierto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {esAnticretico ? "Solicitar Anticrético" : "Solicitar Alquiler"}
+                </h3>
+                <button
+                  onClick={() => setModalAlquilerAbierto(false)}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {property && (
+                <p className="text-sm text-gray-600 mb-4">
+                  Propiedad: <strong>{property.titulo}</strong>
+                  {property.deposito && (
+                    <span className="block mt-1">
+                      Depósito de garantía: <strong className="capitalize">{property.deposito}</strong>
+                    </span>
+                  )}
+                  {esAnticretico && property.duracion_contrato && (
+                    <span className="block mt-1">
+                      Duración del anticrético: <strong className="capitalize">{property.duracion_contrato}</strong>
+                    </span>
+                  )}
+                </p>
+              )}
+
+              <form onSubmit={handleSolicitarAlquiler} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tu teléfono de contacto *
+                  </label>
+                  <input
+                    type="tel"
+                    value={telefonoAlquiler}
+                    onChange={(e) => setTelefonoAlquiler(e.target.value)}
+                    placeholder="77712345"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mensaje para el propietario (opcional)
+                  </label>
+                  <textarea
+                    value={mensajeAlquiler}
+                    onChange={(e) => setMensajeAlquiler(e.target.value)}
+                    placeholder="Hola, estoy interesado en alquilar esta propiedad..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setModalAlquilerAbierto(false)}
+                    disabled={enviandoAlquiler}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={enviandoAlquiler}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {enviandoAlquiler ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       "Enviar Solicitud"

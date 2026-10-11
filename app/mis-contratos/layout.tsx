@@ -45,7 +45,8 @@ export default function MisContratosLayout({
 
   const checkContracts = async (token: string) => {
     try {
-      const response = await fetch("http://localhost:3001/api/contracts/my", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+      const response = await fetch(`${apiUrl}/api/contracts/my`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }

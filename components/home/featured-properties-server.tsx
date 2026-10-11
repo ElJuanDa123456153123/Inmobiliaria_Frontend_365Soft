@@ -1,7 +1,6 @@
 import { PropertyCard } from "./property-card"
 import { getFeaturedProperties } from "@/app/actions/properties"
 import { getImageUrl } from "@/lib/utils"
-import { Loader2 } from "lucide-react"
 
 /**
  * Server Component para propiedades destacadas
@@ -128,6 +127,7 @@ export async function FeaturedPropertiesServer() {
       area: `${property.metros_edificados}m²`,
       image: imageUrl,
       featured: property.destacado,
+    alquilada: property.alquilada,
       description: property.descripcion,
       agentName: nombreVendedor,
       agencyName: nombreAgencia,

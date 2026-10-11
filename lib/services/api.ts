@@ -136,6 +136,14 @@ interface Property {
   terminos_condiciones: string
   estado_propiedad: string
   destacado: boolean
+  alquilada: boolean
+  // Campos específicos de alquiler
+  deposito?: string
+  plazo_minimo?: string
+  servicios_incluidos?: string[]
+  // Campos específicos de anticrético
+  duracion_contrato?: string
+  opcion_compra?: boolean
   vistas_contador: number
   fecha_publicacion?: string
   fecha_expiracion?: string | null // Fecha en que se eliminará automáticamente la publicación (solo visible para el dueño)
@@ -384,7 +392,9 @@ class ApiService {
     tipo_propiedad?: string
     zona?: string
     estado?: string
-    limite?: number
+    destacado?: boolean
+    limite?: number // deprecated: usar limit
+    limit?: number
     offset?: number
   }): Promise<{ propiedades: Property[]; total: number; limite: number; offset: number }> {
     const queryParams = new URLSearchParams()
@@ -393,7 +403,9 @@ class ApiService {
     if (params?.tipo_propiedad) queryParams.append('tipo_propiedad', params.tipo_propiedad)
     if (params?.zona) queryParams.append('zona', params.zona)
     if (params?.estado) queryParams.append('estado', params.estado)
-    if (params?.limite) queryParams.append('limite', params.limite.toString())
+    if (params?.destacado !== undefined) queryParams.append('destacado', String(params.destacado))
+    const limitValue = params?.limit ?? params?.limite
+    if (limitValue) queryParams.append('limit', limitValue.toString())
     if (params?.offset) queryParams.append('offset', params.offset.toString())
 
     const url = queryParams.toString()
@@ -787,6 +799,113 @@ class ApiService {
 
     return this.handleResponse(response)
   }
+
+  // === ALQUILER: SOLICITUDES, CONTRATOS Y CUOTAS ===
+
+  // Interesado: solicitar alquilar una propiedad
+  async solicitarAlquiler(propertyId: number, data: { mensaje?: string; telefono_contacto?: string }): Promise<{ message: string; solicitud: RentalRequest }> {
+    const response = await fetch(`${getApiUrl()}/api/properties/${propertyId}/rental-request`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Propietario: solicitudes recibidas
+  async getSolicitudesRecibidas(estado?: string): Promise<{ solicitudes: RentalRequest[]; total: number }> {
+    const url = estado
+      ? `${getApiUrl()}/api/panel/rental-requests?estado=${encodeURIComponent(estado)}`
+      : `${getApiUrl()}/api/panel/rental-requests`
+    const response = await fetch(url, { headers: this.getHeaders() })
+    return this.handleResponse(response)
+  }
+
+  // Interesado: solicitudes enviadas
+  async getSolicitudesEnviadas(estado?: string): Promise<{ solicitudes: RentalRequest[]; total: number }> {
+    const url = estado
+      ? `${getApiUrl()}/api/rental-requests/my?estado=${encodeURIComponent(estado)}`
+      : `${getApiUrl()}/api/rental-requests/my`
+    const response = await fetch(url, { headers: this.getHeaders() })
+    return this.handleResponse(response)
+  }
+
+  // Propietario: aceptar solicitud → crea contrato + cuotas automáticas (o anticrés en anticrético)
+  async aceptarSolicitud(id: number, data: { fecha_inicio: string; fecha_fin: string; monto_mensual?: number; monto_anticres?: number }): Promise<{ message: string; contrato: RentalContract; cuotas_generadas: number; monto_deposito: number; monto_anticres?: number }> {
+    const response = await fetch(`${getApiUrl()}/api/rental-requests/${id}/accept`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Propietario: terminar contrato (anticipadamente o al vencimiento) + registrar devolución
+  async terminarContrato(contractId: number): Promise<{ message: string; contrato: RentalContract }> {
+    const response = await fetch(`${getApiUrl()}/api/contracts/${contractId}/terminate`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Inquilino: confirmar recepción de la devolución (anticrés o depósito)
+  async confirmarRecepcionDevolucion(paymentId: number): Promise<{ message: string; pago: RentPayment }> {
+    const response = await fetch(`${getApiUrl()}/api/rent-payments/${paymentId}/confirm-receipt`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Propietario: rechazar solicitud
+  async rechazarSolicitud(id: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/rental-requests/${id}/reject`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Propietario: mis inquilinos (contratos como vendedor con resumen de cuotas)
+  async getMisInquilinos(): Promise<{ inquilinos: TenantSummary[]; total: number }> {
+    const response = await fetch(`${getApiUrl()}/api/panel/tenants`, { headers: this.getHeaders() })
+    return this.handleResponse(response)
+  }
+
+  // Inquilino: subir comprobante de una cuota
+  async submitComprobanteCuota(paymentId: number, data: { metodo_pago: string; comprobante_url: string }): Promise<{ message: string; pago: RentPayment }> {
+    const response = await fetch(`${getApiUrl()}/api/rent-payments/${paymentId}/comprobante`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Historial de pagos de alquiler (como vendedor o inquilino)
+  async getPaymentHistory(estado?: string, rol?: string): Promise<{ pagos: RentPayment[]; total: number }> {
+    const params = new URLSearchParams()
+    if (estado) params.append('estado', estado)
+    if (rol) params.append('rol', rol)
+    const qs = params.toString()
+    const response = await fetch(`${getApiUrl()}/api/rent-payments/history${qs ? `?${qs}` : ''}`, {
+      headers: this.getHeaders(),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Descargar PDF de un contrato (retorna la URL para <a href>)
+  getContratoPdfUrl(contractId: number): string {
+    return `${getApiUrl()}/api/contracts/${contractId}/pdf`
+  }
 }
 
 // Interface para planes de suscripción
@@ -901,6 +1020,82 @@ interface UploadDocumentRequest {
   property_id?: number
   is_public?: boolean
   description?: string
+}
+
+// === ALQUILER ===
+
+export interface RentalRequest {
+  id: number
+  property_id: number
+  inquilino_id: number
+  vendedor_id: number
+  mensaje?: string
+  telefono_contacto?: string
+  estado: 'pendiente' | 'aceptada' | 'rechazada' | 'cancelada'
+  contract_id?: number
+  created_at: string
+  property?: Property
+  inquilino?: {
+    id: number
+    nombre: string
+    apellido: string
+    email: string
+    telefono: string
+    avatar_url?: string
+  }
+}
+
+export interface RentalContract {
+  id: number
+  property_id: number
+  inquilino_id: number
+  vendedor_id: number
+  fecha_inicio: string
+  fecha_fin: string
+  monto_mensual: number
+  tipo_contrato: 'alquiler' | 'anticretico'
+  monto_deposito: number
+  estado: 'activo' | 'vencido' | 'terminado'
+  documento_url: string
+  property?: Property
+  inquilino?: {
+    id: number
+    nombre: string
+    apellido: string
+    email: string
+    telefono: string
+  }
+  vendedor?: {
+    id: number
+    nombre: string
+    apellido: string
+    email: string
+    telefono: string
+  }
+}
+
+export interface RentPayment {
+  id: number
+  contract_id: number
+  inquilino_id: number
+  vendedor_id: number
+  mes_correspondiente: number
+  anio: number
+  tipo: 'cuota' | 'deposito' | 'devolucion_deposito' | 'anticres' | 'devolucion_anticres'
+  monto: number
+  fecha_pago: string
+  metodo_pago: string
+  estado: 'pendiente' | 'pagado' | 'atrasado'
+  comprobante_url: string
+  contract?: RentalContract
+}
+
+export interface TenantSummary extends RentalContract {
+  cuotas_pagadas: number
+  cuotas_pendientes: number
+  cuotas_atrasadas: number
+  total_pagado: number
+  pagos: RentPayment[]
 }
 
 export const apiService = new ApiService()

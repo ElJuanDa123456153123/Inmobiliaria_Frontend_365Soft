@@ -564,6 +564,7 @@ function PropiedadesContent() {
                           image={mainImageUrl}
                           publishedDate={new Date(property.created_at).toLocaleDateString('es-BO')}
                           featured={property.destacado}
+                          alquilada={property.alquilada}
                           description={property.descripcion}
                           agentName={property.vendedor_nombre}
                           agencyName={property.vendedor_nombre}

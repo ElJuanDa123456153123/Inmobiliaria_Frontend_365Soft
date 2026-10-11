@@ -21,6 +21,9 @@ export interface Client {
   }
   notas?: string
   proximo_contacto?: string
+  user_id?: number
+  presupuesto?: number
+  zona_preferida?: string
   advisor_id: number
   created_at: string
   updated_at: string
@@ -115,6 +118,8 @@ export interface CreateClientRequest {
   origen: ClientOrigin
   property_id?: number
   notas?: string
+  presupuesto?: number
+  zona_preferida?: string
 }
 
 export interface UpdateClientRequest {
@@ -125,6 +130,8 @@ export interface UpdateClientRequest {
   estado?: ClientStatus
   notas?: string
   proximo_contacto?: string
+  presupuesto?: number
+  zona_preferida?: string
 }
 
 export interface CreateInteractionRequest {

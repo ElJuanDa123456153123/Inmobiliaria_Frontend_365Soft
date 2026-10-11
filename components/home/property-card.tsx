@@ -3,7 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
-import { MapPin, Bed, Bath, Maximize, Calendar, MessageCircle, Phone, Star, ChevronLeft, ChevronRight, Building2, Check, Circle } from "lucide-react"
+import { MapPin, Bed, Bath, Maximize, MessageCircle, Phone, Star, ChevronLeft, ChevronRight, Building2, Check, Circle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -21,6 +21,7 @@ interface PropertyCardProps {
   image: string
   publishedDate?: string
   featured?: boolean
+  alquilada?: boolean
   description?: string
   agentName?: string
   agencyName?: string
@@ -48,6 +49,7 @@ export function PropertyCard({
   image,
   publishedDate,
   featured = false,
+  alquilada = false,
   description,
   agentName,
   agencyName,
@@ -117,6 +119,13 @@ export function PropertyCard({
           <div className="absolute top-4 left-4 bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
             <Star className="h-3 w-3 fill-current" />
             Destacado
+          </div>
+        )}
+
+        {/* Alquilada Badge */}
+        {alquilada && (
+          <div className="absolute top-16 left-4 bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow">
+            Alquilada
           </div>
         )}
 

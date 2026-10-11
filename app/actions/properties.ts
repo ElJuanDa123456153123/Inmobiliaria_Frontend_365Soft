@@ -10,7 +10,8 @@ export async function getFeaturedProperties() {
   try {
     const response = await apiService.listProperties({
       estado: 'activo',
-      limite: 6,
+      destacado: true,
+      limit: 6,
     })
     return { success: true, data: response }
   } catch (error) {

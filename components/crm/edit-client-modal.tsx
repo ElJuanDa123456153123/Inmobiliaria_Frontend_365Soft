@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { User, Phone, Mail, MessageSquare, FileText } from "lucide-react"
+import { User, Phone, Mail, MessageSquare, FileText, Wallet, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,6 +30,9 @@ interface EditClientModalProps {
 
 export function EditClientModal({ client, onClose, onSuccess }: EditClientModalProps) {
   const [loading, setLoading] = useState(false)
+  const [presupuestoStr, setPresupuestoStr] = useState(
+    client.presupuesto ? String(client.presupuesto) : ""
+  )
   const [formData, setFormData] = useState<UpdateClientRequest>({
     nombre: client.nombre,
     telefono: client.telefono,
@@ -38,9 +41,11 @@ export function EditClientModal({ client, onClose, onSuccess }: EditClientModalP
     estado: client.estado,
     notas: client.notas || "",
     proximo_contacto: client.proximo_contacto || "",
+    zona_preferida: client.zona_preferida || "",
   })
 
   useEffect(() => {
+    setPresupuestoStr(client.presupuesto ? String(client.presupuesto) : "")
     setFormData({
       nombre: client.nombre,
       telefono: client.telefono,
@@ -49,6 +54,7 @@ export function EditClientModal({ client, onClose, onSuccess }: EditClientModalP
       estado: client.estado,
       notas: client.notas || "",
       proximo_contacto: client.proximo_contacto || "",
+      zona_preferida: client.zona_preferida || "",
     })
   }, [client])
 
@@ -65,9 +71,19 @@ export function EditClientModal({ client, onClose, onSuccess }: EditClientModalP
       return
     }
 
+    // Presupuesto: número válido o vacío
+    const presupuesto = presupuestoStr.trim() ? parseFloat(presupuestoStr) : undefined
+    if (presupuestoStr.trim() && (!presupuesto || presupuesto <= 0)) {
+      toast.error("El presupuesto debe ser un número mayor a 0")
+      return
+    }
+
     try {
       setLoading(true)
-      await crmApiService.updateClient(client.id, formData)
+      await crmApiService.updateClient(client.id, {
+        ...formData,
+        presupuesto,
+      })
       onSuccess()
       onClose()
     } catch (error: any) {
@@ -139,6 +155,43 @@ export function EditClientModal({ client, onClose, onSuccess }: EditClientModalP
               disabled={loading}
             />
           </div>
+
+          {/* Presupuesto y Zona preferida (lead scoring) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="presupuesto" className="flex items-center gap-1">
+                <Wallet className="w-3.5 h-3.5" />
+                Presupuesto (Bs)
+              </Label>
+              <Input
+                id="presupuesto"
+                type="number"
+                min="1"
+                step="0.01"
+                placeholder="150000"
+                value={presupuestoStr}
+                onChange={(e) => setPresupuestoStr(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="zona_preferida" className="flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" />
+                Zona preferida
+              </Label>
+              <Input
+                id="zona_preferida"
+                placeholder="Ej: Sacaba"
+                value={formData.zona_preferida}
+                onChange={(e) => handleChange("zona_preferida", e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Estos datos alimentan el lead scoring (+20 y +15 pts respectivamente). Si el email o
+            teléfono coinciden con un usuario registrado, se vincula automáticamente su actividad.
+          </p>
 
           {/* Estado */}
           <div className="space-y-2">

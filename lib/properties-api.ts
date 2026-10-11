@@ -38,6 +38,7 @@ export interface Property {
   estado_propiedad: string
   vistas_contador: number
   destacado: boolean
+  alquilada: boolean
   created_at: string
   vendedor_nombre: string
   vendedor_email: string
