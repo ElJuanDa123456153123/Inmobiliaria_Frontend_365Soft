@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 export type PaymentStep = 'method' | 'proof' | 'confirm' | 'success'
 
-interface StepConfig {
+export interface StepConfig {
   id: PaymentStep
   title: string
   description: string
@@ -55,6 +55,10 @@ interface PaymentWizardProps {
   onBack?: () => void
   children: React.ReactNode
   isSubmitting?: boolean
+  /** Sobrescribe los pasos del indicador (ej: flujo QR de 2 pasos) */
+  stepsConfig?: StepConfig[]
+  /** Oculta los botones Anterior/Siguiente (el paso maneja sus propias acciones) */
+  hideNavigation?: boolean
 }
 
 export default function PaymentWizard({
@@ -64,10 +68,14 @@ export default function PaymentWizard({
   onProceed,
   onBack,
   children,
-  isSubmitting = false
+  isSubmitting = false,
+  stepsConfig,
+  hideNavigation = false
 }: PaymentWizardProps) {
+  const activeSteps = stepsConfig && stepsConfig.length > 0 ? stepsConfig : steps
+
   const getCurrentStepIndex = () => {
-    return steps.findIndex(s => s.id === currentStep)
+    return activeSteps.findIndex(s => s.id === currentStep)
   }
 
   const currentIndex = getCurrentStepIndex()
@@ -86,7 +94,7 @@ export default function PaymentWizard({
 
   const goToStep = (stepIndex: number) => {
     if (stepIndex <= currentIndex) {
-      onStepChange(steps[stepIndex].id)
+      onStepChange(activeSteps[stepIndex].id)
     }
   }
 
@@ -102,7 +110,7 @@ export default function PaymentWizard({
       <div className="mb-8">
         {/* Step Indicators */}
         <div className="flex items-center justify-between mb-4">
-          {steps.map((step, index) => {
+          {activeSteps.map((step, index) => {
             const status = getStepStatus(index)
             const Icon = step.icon
 
@@ -162,7 +170,7 @@ export default function PaymentWizard({
                 </button>
 
                 {/* Connector Line */}
-                {index < steps.length - 1 && (
+                {index < activeSteps.length - 1 && (
                   <div
                     className={cn(
                       "flex-1 h-1 mx-4 mt-7 rounded-full transition-all duration-500 max-w-[80px]",
@@ -180,6 +188,7 @@ export default function PaymentWizard({
       <div className="mb-8">{children}</div>
 
       {/* Navigation Buttons */}
+      {!hideNavigation && (
       <div className="flex items-center justify-between gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
         {/* Back Button */}
         <Button
@@ -195,7 +204,7 @@ export default function PaymentWizard({
 
         {/* Step Indicator */}
         <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-          Paso {currentIndex + 1} de {steps.length}
+          Paso {currentIndex + 1} de {activeSteps.length}
         </div>
 
         {/* Next/Submit Button */}
@@ -205,7 +214,7 @@ export default function PaymentWizard({
           size="lg"
           className={cn(
             "flex items-center gap-2 min-w-[140px]",
-            currentIndex === steps.length - 1 && "bg-green-600 hover:bg-green-700"
+            currentIndex === activeSteps.length - 1 && "bg-green-600 hover:bg-green-700"
           )}
         >
           {isSubmitting ? (
@@ -216,7 +225,7 @@ export default function PaymentWizard({
               </svg>
               Procesando...
             </>
-          ) : currentIndex === steps.length - 1 ? (
+          ) : currentIndex === activeSteps.length - 1 ? (
             <>
               Confirmar Pago
               <Check className="w-4 h-4" />
@@ -229,6 +238,7 @@ export default function PaymentWizard({
           )}
         </Button>
       </div>
+      )}
     </div>
   )
 }

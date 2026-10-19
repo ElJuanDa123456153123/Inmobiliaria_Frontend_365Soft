@@ -671,8 +671,8 @@ export default function PanelMensajesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Mensajes</h1>
-          <p className="text-gray-600 mt-1">Comunica con otros usuarios</p>
+          <h1 className="text-3xl font-bold text-gray-900">Consultas</h1>
+          <p className="text-gray-600 mt-1">Preguntas y conversaciones sobre tus propiedades</p>
         </div>
       </div>
 
@@ -762,7 +762,6 @@ export default function PanelMensajesPage() {
                   {selectedConversation.property_id && (
                     <Button
                       onClick={() => setModalVisitaAbierto(true)}
-                      variant="outline"
                       size="sm"
                       className="flex items-center gap-2"
                     >
@@ -771,15 +770,15 @@ export default function PanelMensajesPage() {
                     </Button>
                   )}
 
-                  {/* Botón Eliminar Conversación */}
+                  {/* Botón Eliminar Conversación (destructivo, discreto) */}
                   <Button
                     onClick={handleDeleteConversation}
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    title="Eliminar conversación"
+                    className="flex items-center gap-2 text-gray-400 hover:text-red-600 hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" />
-                    Eliminar
                   </Button>
                 </div>
               </div>

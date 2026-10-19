@@ -102,7 +102,7 @@ export default function MapaSelector({ latitud, longitud, onUbicacionChange, rea
       {!readonly && (
         <div className="absolute bottom-4 left-4 bg-white px-3 py-2 rounded-lg shadow-md text-sm z-[1000]">
           <p className="text-xs text-gray-600">
-            Click en el mapa para seleccionar ubicación precisa
+            Click en el mapa: se coloca el pin y se autocompleta la zona
           </p>
         </div>
       )}

@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import dynamicImport from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import { useFormularioPublicacion } from "@/lib/contexts/FormularioContext"
+import { getUserIdFromToken } from "@/lib/user-prefs"
+import { getImageUrl } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { apiService } from "@/lib/services/api"
@@ -28,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Pencil, DollarSign, KeyRound, Handshake } from "lucide-react"
 
 // Dynamically import components with SSR disabled
 const MapaSelector = dynamicImport(() => import("@/components/mapa/MapaSelector"), { ssr: false })
@@ -55,6 +58,7 @@ export function FormularioContent() {
   const [mapaCentro, setMapaCentro] = useState<{ lat: number; lng: number } | undefined>()
   const [isAdmin, setIsAdmin] = useState(false)
   const [mostrarDialogoCancelar, setMostrarDialogoCancelar] = useState(false)
+  const [cargandoEdicion, setCargandoEdicion] = useState(false)
   const {
     pasoActual,
     datosOperacion,
@@ -63,6 +67,8 @@ export function FormularioContent() {
     confortSeguridad,
     imagenesDatos,
     descripcionDatos,
+    isInitialized,
+    editPropertyId,
     setPasoActual,
     setDatosOperacion,
     setDatosGenerales,
@@ -70,6 +76,7 @@ export function FormularioContent() {
     setConfortSeguridad,
     setImagenesDatos,
     setDescripcionDatos,
+    setEditPropertyId,
     resetFormulario,
   } = useFormularioPublicacion()
 
@@ -87,6 +94,129 @@ export function FormularioContent() {
       localStorage.removeItem('planSeleccionado')
     }
   }, [])
+
+  // ══════════ MODO EDICIÓN (?edit=<id>) ══════════
+  // Se activa desde el panel de propiedades. Espera a que el provider
+  // hidrate localStorage para limpiar cualquier borrador anterior y
+  // precargar los datos reales de la propiedad.
+  useEffect(() => {
+    if (!isInitialized) return
+    const editParam = new URLSearchParams(window.location.search).get('edit')
+    if (!editParam) return
+
+    const id = parseInt(editParam)
+    if (isNaN(id)) return
+
+    // Ya está cargada esta propiedad en contexto (refresh de página)
+    if (editPropertyId === id) return
+
+    iniciarEdicion(id)
+  }, [isInitialized])
+
+  const iniciarEdicion = async (id: number) => {
+    // Verificar que el usuario logueado sea el dueño
+    const token = localStorage.getItem('token')
+    if (!token) {
+      toast.error('Debes iniciar sesión para editar una propiedad')
+      router.push('/ingresar')
+      return
+    }
+    const userId = getUserIdFromToken()
+    try {
+      setCargandoEdicion(true)
+
+      const propiedad = await apiService.getProperty(id)
+      if (userId && Number(userId) !== propiedad.user_id) {
+        toast.error('No tienes permiso para editar esta propiedad')
+        router.push('/panel/propiedades')
+        return
+      }
+
+      // Limpiar cualquier borrador previo y marcar modo edición
+      resetFormulario()
+      setEditPropertyId(id)
+
+      // ══════════ PASO 1: Datos de operación ══════════
+      setDatosOperacion({
+        titulo: propiedad.titulo,
+        tipoOperacion: (propiedad.tipo_operacion as 'venta' | 'alquiler' | 'anticretico') || 'venta',
+        precio: String(propiedad.precio ?? ''),
+        moneda: (propiedad.moneda as 'USD' | 'BOB') || 'BOB',
+        aceptaPermuta: Boolean(propiedad.acepta_permuta),
+        financia: Boolean(propiedad.financia),
+        deposito: propiedad.deposito || '',
+        plazoMinimo: propiedad.plazo_minimo || '',
+        serviciosIncluidos: propiedad.servicios_incluidos || [],
+        duracionContrato: propiedad.duracion_contrato || '',
+        opcionCompra: Boolean(propiedad.opcion_compra),
+      })
+
+      // ══════════ PASO 2: Datos generales ══════════
+      setDatosGenerales({
+        tipoPropiedad: propiedad.tipo_propiedad || '',
+        direccion: propiedad.direccion || '',
+        zona: propiedad.zona || '',
+        tipoMarcador: (propiedad.tipo_marcador as 'punto-exacto' | 'aproximado') || 'punto-exacto',
+        latitud: propiedad.latitud,
+        longitud: propiedad.longitud,
+        mostrarDireccion: Boolean(propiedad.mostrar_direccion),
+      })
+      if (propiedad.latitud && propiedad.longitud) {
+        setMapaCentro({ lat: propiedad.latitud, lng: propiedad.longitud })
+      }
+
+      // ══════════ PASO 3: Detalles ══════════
+      setDetallesPropiedad({
+        dormitorios: String(propiedad.dormitorios ?? ''),
+        banos: String(propiedad.banos ?? ''),
+        garaje: String(propiedad.garaje ?? '0'),
+        metrosEdificados: String(propiedad.metros_edificados ?? ''),
+        metrosTerreno: String(propiedad.metros_terreno ?? ''),
+        estado: propiedad.estado || '',
+        anoConstruccion: propiedad.ano_construccion ? String(propiedad.ano_construccion) : '',
+        aptoOficina: Boolean(propiedad.apto_oficina),
+        viviendaSocial: Boolean(propiedad.vivienda_social),
+        condominio: Boolean(propiedad.condominio),
+        cantidadPisos: String(propiedad.cantidad_pisos || 1),
+      })
+
+      // ══════════ PASO 4: Confort y seguridad ══════════
+      setConfortSeguridad({
+        confort: propiedad.confort || [],
+        seguridad: propiedad.seguridad || [],
+        noAplica: Boolean(propiedad.no_aplica_confort),
+      })
+
+      // ══════════ PASO 5: Imágenes y video ══════════
+      setImagenesDatos({
+        imagenes: (propiedad.imagenes || []).map((img) => ({
+          id: `img-${img.id}`,
+          preview: getImageUrl(img.image_url) || img.image_url,
+          url: img.image_url,
+          orden: img.orden,
+        })),
+        archivos: [],
+        video: propiedad.video_url || '',
+      })
+
+      // ══════════ PASO 6: Descripción ══════════
+      setDescripcionDatos({
+        descripcion: propiedad.descripcion || '',
+        terminosCondiciones: propiedad.terminos_condiciones || '',
+      })
+
+      setPasoActual(1)
+      toast.info('Modo edición', {
+        description: 'Los cambios reemplazarán el aviso actual',
+      })
+    } catch (error: any) {
+      console.error('Error cargando propiedad para editar:', error)
+      toast.error(error.message || 'No se pudo cargar la propiedad')
+      router.push('/panel/propiedades')
+    } finally {
+      setCargandoEdicion(false)
+    }
+  }
 
   const handleNextStep = () => {
     if (pasoActual < 7) {
@@ -122,6 +252,41 @@ export function FormularioContent() {
       setDatosGenerales({
         zona: zona
       })
+    }
+  }
+
+  // Click en el mapa → guardar coordenadas + autocompletar la zona con
+  // geocodificación inversa (Nominatim / OpenStreetMap)
+  const handleMapaClick = async (lat: number, lng: number) => {
+    setDatosGenerales({ latitud: lat, longitud: lng })
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=es`,
+        { headers: { 'Accept-Language': 'es' } }
+      )
+      if (!res.ok) return
+
+      const data = await res.json()
+      const address = data?.address || {}
+      const calle = address.road || address.pedestrian || address.residential || ''
+      const numero = address.house_number || ''
+      const calleCompleta = numero ? `${calle} ${numero}` : calle
+      const barrio = address.suburb || address.district || address.neighbourhood || ''
+      const localidad = address.city || address.town || address.village || address.municipality || ''
+      const departamento = address.state || ''
+
+      // Zona formateada sin duplicados: "Calle, Barrio, Ciudad, Departamento"
+      const partes = [calleCompleta, barrio, localidad, departamento]
+        .filter(Boolean)
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+
+      if (partes.length > 0) {
+        setDatosGenerales({ zona: partes.join(', ') })
+      }
+    } catch (error) {
+      console.error('Error en geocodificación inversa:', error)
+      // Si falla, el usuario puede escribir la zona manualmente
     }
   }
 
@@ -232,11 +397,16 @@ export function FormularioContent() {
         terminos_condiciones: descripcionDatos.terminosCondiciones.trim(),
       }
 
-      // Enviar al backend
-      const response = await apiService.createProperty(payload)
+      // Enviar al backend: PUT en modo edición, POST al crear
+      const modoEdicion = Boolean(editPropertyId)
+      if (modoEdicion) {
+        await apiService.updateProperty(editPropertyId!, payload)
+      } else {
+        await apiService.createProperty(payload)
+      }
 
-      toast.success('¡Propiedad publicada con éxito!', {
-        description: 'Será redirigido a tu perfil...',
+      toast.success(modoEdicion ? '¡Propiedad actualizada con éxito!' : '¡Propiedad publicada con éxito!', {
+        description: 'Serás redirigido a tu panel...',
         duration: 3000,
       })
 
@@ -245,7 +415,11 @@ export function FormularioContent() {
 
       // Redirigir después de un momento
       setTimeout(() => {
-        router.push(isAdmin ? '/admin/propiedades' : '/perfil')
+        if (modoEdicion || !isAdmin) {
+          router.push('/panel/propiedades')
+        } else {
+          router.push('/admin/propiedades')
+        }
       }, 2000)
     } catch (error: any) {
       console.error('Error publicando propiedad:', error)
@@ -267,16 +441,18 @@ export function FormularioContent() {
       localStorage.removeItem('formulario-publicacion-storage')
     }
     // Mostrar toast
-    toast.info('Publicación cancelada', {
-      description: 'Los datos han sido descartados',
+    toast.info(editPropertyId ? 'Cambios descartados' : 'Borrador descartado', {
+      description: editPropertyId
+        ? 'Tu aviso sigue publicado tal como estaba'
+        : 'Los datos han sido descartados',
     })
     // Cerrar diálogo
     setMostrarDialogoCancelar(false)
-    // Redirigir al home o según el rol
+    // Redirigir: en edición al panel, según el rol en creación
     if (isAdmin) {
       router.push('/admin/propiedades')
     } else {
-      router.push('/')
+      router.push('/panel/propiedades')
     }
   }
 
@@ -288,8 +464,42 @@ export function FormularioContent() {
     <div className={isAdmin ? "min-h-screen bg-gray-100" : "flex flex-col min-h-screen bg-gray-50"}>
       {!isAdmin && <Header />}
 
+      {/* Pantalla de carga al precargar una propiedad en modo edición */}
+      {cargandoEdicion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando datos de la propiedad...</p>
+          </div>
+        </div>
+      )}
+
       <main className={isAdmin ? "flex-1 py-8" : "flex-1 py-8"}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Banner modo edición */}
+          {editPropertyId && !cargandoEdicion && (
+            <div className="mb-6 rounded-lg border-l-4 border-primary bg-primary/10 px-5 py-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <Pencil className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    Estás editando tu aviso
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Guarda los cambios al final para que se reflejen en tu publicación
+                  </p>
+                </div>
+              </div>
+              <Link href="/panel/propiedades">
+                <Button size="sm" className="shadow">
+                  ← Volver al panel
+                </Button>
+              </Link>
+            </div>
+          )}
+
           {/* Header para admin */}
           {isAdmin && (
             <div className="mb-6">
@@ -300,8 +510,14 @@ export function FormularioContent() {
               >
                 ← Volver al Panel de Admin
               </Button>
-              <h1 className="text-3xl font-bold text-gray-900">Publicar Propiedad</h1>
-              <p className="text-gray-600 mt-2">Completa el formulario para publicar una nueva propiedad</p>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {editPropertyId ? "Editar Propiedad" : "Publicar Propiedad"}
+              </h1>
+              <p className="text-gray-600 mt-2">
+                {editPropertyId
+                  ? "Modifica los datos que quieras actualizar"
+                  : "Completa el formulario para publicar una nueva propiedad"}
+              </p>
             </div>
           )}
 
@@ -333,7 +549,7 @@ export function FormularioContent() {
 
                 <div className="border-t mt-6 pt-6">
                   <p className="text-sm font-medium text-gray-700 mb-2">
-                    Completa el proceso para publicar
+                    {editPropertyId ? "Revisa y guarda tus cambios" : "Completa el proceso para publicar"}
                   </p>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -345,13 +561,14 @@ export function FormularioContent() {
                     {calcularProgreso()}% del progreso
                   </p>
 
-                  {/* Botón Cancelar */}
+                  {/* Botón descartar: en edición descarta cambios, en creación descarta borrador.
+                      Nunca elimina la propiedad publicada. */}
                   <Button
                     variant="outline"
                     onClick={handleCancelar}
-                    className="w-full mt-4 bg-red-600 text-white border-red-600 hover:bg-red-700 hover:border-red-700 hover:text-white font-semibold"
+                    className="w-full mt-4 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-400 font-medium"
                   >
-                    Cancelar publicación
+                    {editPropertyId ? "Descartar cambios" : "Descartar borrador"}
                   </Button>
                 </div>
               </div>
@@ -381,39 +598,59 @@ export function FormularioContent() {
                     >
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Título de la propiedad <span className="text-red-500">*</span>
+                          Título del aviso <span className="text-red-500">*</span>
                         </label>
                         <Input
                           type="text"
                           value={datosOperacion.titulo}
                           onChange={(e) => setDatosOperacion({ titulo: e.target.value })}
-                          placeholder=""
+                          placeholder="Ej: Amplia casa con jardín en Condominio Los Olivos"
                           maxLength={80}
                           className="bg-gray-50 border-gray-300"
                         />
-                        <p className="text-xs text-gray-500 mt-1">Quedan {80 - datosOperacion.titulo.length} car.</p>
+                        <p className="text-xs text-gray-500 mt-1">Quedan {80 - datosOperacion.titulo.length} caracteres</p>
                       </div>
 
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Tipo de operación <span className="text-red-500">*</span>
+                          ¿Qué quieres hacer? <span className="text-red-500">*</span>
                         </label>
-                        <Select value={datosOperacion.tipoOperacion} onValueChange={(value) => setDatosOperacion({ tipoOperacion: value as any })}>
-                          <SelectTrigger className="bg-gray-50 border-gray-300">
-                            <SelectValue placeholder="Venta" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="venta">Venta</SelectItem>
-                            <SelectItem value="alquiler">Alquiler</SelectItem>
-                            <SelectItem value="anticretico">Anticrético</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { value: 'venta', label: 'Vender', desc: 'Venta de propiedad', icon: DollarSign },
+                            { value: 'alquiler', label: 'Alquilar', desc: 'Renta mensual', icon: KeyRound },
+                            { value: 'anticretico', label: 'Anticrético', desc: 'Capital a cambio de uso', icon: Handshake },
+                          ].map((op) => {
+                            const Icon = op.icon
+                            const isSelected = datosOperacion.tipoOperacion === op.value
+                            return (
+                              <button
+                                key={op.value}
+                                type="button"
+                                onClick={() => setDatosOperacion({ tipoOperacion: op.value as any })}
+                                className={`
+                                  flex flex-col items-center gap-1 px-3 py-4 rounded-xl border-2 text-center transition-all
+                                  ${isSelected
+                                    ? 'bg-primary/5 border-primary shadow-md'
+                                    : 'bg-gray-50 border-gray-200 hover:border-primary/50'
+                                  }
+                                `}
+                              >
+                                <Icon className={`w-6 h-6 ${isSelected ? 'text-primary' : 'text-gray-400'}`} />
+                                <span className={`text-sm font-semibold ${isSelected ? 'text-primary' : 'text-gray-700'}`}>
+                                  {op.label}
+                                </span>
+                                <span className="text-[11px] text-gray-500 leading-tight">{op.desc}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
 
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                           {datosOperacion.tipoOperacion === 'venta' && 'Precio de venta'}
-                          {datosOperacion.tipoOperacion === 'alquiler' && 'Precio mensual de alquiler'}
+                          {datosOperacion.tipoOperacion === 'alquiler' && 'Alquiler mensual'}
                           {datosOperacion.tipoOperacion === 'anticretico' && 'Monto de anticrético'}
                           {!datosOperacion.tipoOperacion && 'Precio'}
                           <span className="text-red-500">*</span>
@@ -444,57 +681,63 @@ export function FormularioContent() {
                         )}
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Acepta permuta:
-                        </label>
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="aceptaPermuta"
-                              checked={datosOperacion.aceptaPermuta}
-                              onChange={() => setDatosOperacion({ aceptaPermuta: true })}
-                            />
-                            <span>Sí</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="aceptaPermuta"
-                              checked={!datosOperacion.aceptaPermuta}
-                              onChange={() => setDatosOperacion({ aceptaPermuta: false })}
-                            />
-                            <span>No</span>
-                          </label>
+                      {/* Condiciones de venta: solo aplican para VENTA */}
+                      {datosOperacion.tipoOperacion === 'venta' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-gray-50 border border-gray-200">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Acepta permuta
+                            </label>
+                            <div className="flex gap-2">
+                              {[
+                                { value: true, label: 'Sí' },
+                                { value: false, label: 'No' },
+                              ].map((op) => (
+                                <button
+                                  key={String(op.value)}
+                                  type="button"
+                                  onClick={() => setDatosOperacion({ aceptaPermuta: op.value })}
+                                  className={`
+                                    px-5 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                                    ${datosOperacion.aceptaPermuta === op.value
+                                      ? 'bg-primary text-white border-primary shadow'
+                                      : 'bg-white text-gray-600 border-gray-300 hover:border-primary/50'
+                                    }
+                                  `}
+                                >
+                                  {op.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Financia la venta
+                            </label>
+                            <div className="flex gap-2">
+                              {[
+                                { value: true, label: 'Sí' },
+                                { value: false, label: 'No' },
+                              ].map((op) => (
+                                <button
+                                  key={String(op.value)}
+                                  type="button"
+                                  onClick={() => setDatosOperacion({ financia: op.value })}
+                                  className={`
+                                    px-5 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                                    ${datosOperacion.financia === op.value
+                                      ? 'bg-primary text-white border-primary shadow'
+                                      : 'bg-white text-gray-600 border-gray-300 hover:border-primary/50'
+                                    }
+                                  `}
+                                >
+                                  {op.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Financia:
-                        </label>
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="financia"
-                              checked={datosOperacion.financia}
-                              onChange={() => setDatosOperacion({ financia: true })}
-                            />
-                            <span>Sí</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="financia"
-                              checked={!datosOperacion.financia}
-                              onChange={() => setDatosOperacion({ financia: false })}
-                            />
-                            <span>No</span>
-                          </label>
-                        </div>
-                      </div>
+                      )}
 
                       {/* Campos específicos para ALQUILER */}
                       {datosOperacion.tipoOperacion === 'alquiler' && (
@@ -722,7 +965,7 @@ export function FormularioContent() {
                           <MapaSelector
                             latitud={datosGenerales.latitud}
                             longitud={datosGenerales.longitud}
-                            onUbicacionChange={(lat, lng) => setDatosGenerales({ latitud: lat, longitud: lng })}
+                            onUbicacionChange={handleMapaClick}
                             forzarCentro={mapaCentro}
                           />
                         </div>
@@ -749,226 +992,228 @@ export function FormularioContent() {
                       transition={{ duration: 0.3 }}
                       className="space-y-6"
                     >
+                      {/* Distribución */}
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Dormitorios <span className="text-red-500">*</span>
-                        </label>
-                        <div className="flex gap-3 flex-wrap">
-                          {["1 Ambiente", "1", "2", "3", "4", "5+"].map((opcion) => {
-                            const isSelected = detallesPropiedad.dormitorios === opcion
+                        <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Distribución</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Dormitorios <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex gap-2 flex-wrap">
+                              {["1 Ambiente", "1", "2", "3", "4", "5+"].map((opcion) => {
+                                const isSelected = detallesPropiedad.dormitorios === opcion
+                                return (
+                                  <label
+                                    key={opcion}
+                                    className={`
+                                      flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-all
+                                      ${isSelected
+                                        ? 'bg-primary text-white border-primary shadow-md'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:bg-primary/5'
+                                      }
+                                    `}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="dormitorios"
+                                      value={opcion}
+                                      checked={isSelected}
+                                      onChange={(e) => setDetallesPropiedad({ dormitorios: e.target.value })}
+                                      className="sr-only"
+                                    />
+                                    <span className="font-medium">{opcion}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Baños <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex gap-2 flex-wrap">
+                              {["1", "2", "3+"].map((opcion) => {
+                                const isSelected = detallesPropiedad.banos === opcion
+                                return (
+                                  <label
+                                    key={opcion}
+                                    className={`
+                                      flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-all
+                                      ${isSelected
+                                        ? 'bg-primary text-white border-primary shadow-md'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:bg-primary/5'
+                                      }
+                                    `}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="banos"
+                                      value={opcion}
+                                      checked={isSelected}
+                                      onChange={(e) => setDetallesPropiedad({ banos: e.target.value })}
+                                      className="sr-only"
+                                    />
+                                    <span className="font-medium">{opcion}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Garaje
+                            </label>
+                            <div className="flex gap-2 flex-wrap">
+                              {["0", "1", "2", "3+"].map((opcion) => {
+                                const isSelected = detallesPropiedad.garaje === opcion
+                                return (
+                                  <label
+                                    key={opcion}
+                                    className={`
+                                      flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-all
+                                      ${isSelected
+                                        ? 'bg-primary text-white border-primary shadow-md'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:bg-primary/5'
+                                      }
+                                    `}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="garaje"
+                                      value={opcion}
+                                      checked={isSelected}
+                                      onChange={(e) => setDetallesPropiedad({ garaje: e.target.value })}
+                                      className="sr-only"
+                                    />
+                                    <span className="font-medium">{opcion === "0" ? "Sin garaje" : opcion}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Cantidad de pisos
+                            </label>
+                            <Input
+                              type="number"
+                              value={detallesPropiedad.cantidadPisos}
+                              onChange={(e) => setDetallesPropiedad({ cantidadPisos: e.target.value })}
+                              className="bg-gray-50 border-gray-300"
+                              placeholder="Ej: 1"
+                              min="1"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Superficies */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Superficies</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Metros edificados <span className="text-red-500">*</span>
+                            </label>
+                            <Input
+                              type="number"
+                              value={detallesPropiedad.metrosEdificados}
+                              onChange={(e) => setDetallesPropiedad({ metrosEdificados: e.target.value })}
+                              className="bg-gray-50 border-gray-300"
+                              placeholder="Ej: 120"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Superficie cubierta en m²</p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Metros del terreno
+                            </label>
+                            <Input
+                              type="number"
+                              value={detallesPropiedad.metrosTerreno}
+                              onChange={(e) => setDetallesPropiedad({ metrosTerreno: e.target.value })}
+                              className="bg-gray-50 border-gray-300"
+                              placeholder="Ej: 200"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Superficie total del terreno en m² (opcional)</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Estado y antigüedad */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Estado y antigüedad</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Estado <span className="text-red-500">*</span>
+                            </label>
+                            <Select value={detallesPropiedad.estado} onValueChange={(value) => setDetallesPropiedad({ estado: value })}>
+                              <SelectTrigger className="bg-gray-50 border-gray-300">
+                                <SelectValue placeholder="Selecciona" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="excelente">Excelente</SelectItem>
+                                <SelectItem value="muy-bueno">Muy Bueno</SelectItem>
+                                <SelectItem value="bueno">Bueno</SelectItem>
+                                <SelectItem value="regular">Regular</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Año de construcción
+                            </label>
+                            <Input
+                              type="number"
+                              value={detallesPropiedad.anoConstruccion}
+                              onChange={(e) => setDetallesPropiedad({ anoConstruccion: e.target.value })}
+                              className="bg-gray-50 border-gray-300"
+                              placeholder="Ej: 2020"
+                              min="1900"
+                              max={new Date().getFullYear()}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Características adicionales */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Características adicionales</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {[
+                            { key: 'aptoOficina', label: 'Apto para oficina', desc: 'Uso profesional' },
+                            { key: 'viviendaSocial', label: 'Vivienda social', desc: 'Programa gubernamental' },
+                            { key: 'condominio', label: 'En condominio', desc: 'Condominio privado' },
+                          ].map((car) => {
+                            const checked = detallesPropiedad[car.key as keyof typeof detallesPropiedad] as boolean
                             return (
                               <label
-                                key={opcion}
+                                key={car.key}
                                 className={`
-                                  flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-all
-                                  ${isSelected
-                                    ? 'bg-primary text-white border-primary shadow-md'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:bg-primary/5'
-                                  }
+                                  flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all
+                                  ${checked ? 'bg-primary/5 border-primary' : 'bg-white border-gray-200 hover:border-primary/40'}
                                 `}
                               >
                                 <input
-                                  type="radio"
-                                  name="dormitorios"
-                                  value={opcion}
-                                  checked={isSelected}
-                                  onChange={(e) => setDetallesPropiedad({ dormitorios: e.target.value })}
-                                  className="sr-only"
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => setDetallesPropiedad({ [car.key]: e.target.checked })}
+                                  className="w-5 h-5 mt-0.5 text-primary border-gray-300 rounded focus:ring-primary"
                                 />
-                                <span className="font-medium">{opcion}</span>
+                                <div>
+                                  <span className="text-sm font-semibold text-gray-700 block">{car.label}</span>
+                                  <p className="text-xs text-gray-500">{car.desc}</p>
+                                </div>
                               </label>
                             )
                           })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Baños <span className="text-red-500">*</span>
-                        </label>
-                        <div className="flex gap-3 flex-wrap">
-                          {["1", "2", "3+"].map((opcion) => {
-                            const isSelected = detallesPropiedad.banos === opcion
-                            return (
-                              <label
-                                key={opcion}
-                                className={`
-                                  flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-all
-                                  ${isSelected
-                                    ? 'bg-primary text-white border-primary shadow-md'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:bg-primary/5'
-                                  }
-                                `}
-                              >
-                                <input
-                                  type="radio"
-                                  name="banos"
-                                  value={opcion}
-                                  checked={isSelected}
-                                  onChange={(e) => setDetallesPropiedad({ banos: e.target.value })}
-                                  className="sr-only"
-                                />
-                                <span className="font-medium">{opcion}</span>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Metros edificados <span className="text-red-500">*</span>
-                        </label>
-                        <Input
-                          type="number"
-                          value={detallesPropiedad.metrosEdificados}
-                          onChange={(e) => setDetallesPropiedad({ metrosEdificados: e.target.value })}
-                          className="bg-gray-50 border-gray-300"
-                          placeholder="Ej: 120"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Superficie cubierta en m²</p>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Metros del terreno
-                        </label>
-                        <Input
-                          type="number"
-                          value={detallesPropiedad.metrosTerreno}
-                          onChange={(e) => setDetallesPropiedad({ metrosTerreno: e.target.value })}
-                          className="bg-gray-50 border-gray-300"
-                          placeholder="Ej: 200"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Superficie total del terreno en m² (opcional)</p>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Garaje
-                        </label>
-                        <div className="flex gap-3 flex-wrap">
-                          {["0", "1", "2", "3+"].map((opcion) => {
-                            const isSelected = detallesPropiedad.garaje === opcion
-                            return (
-                              <label
-                                key={opcion}
-                                className={`
-                                  flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-all
-                                  ${isSelected
-                                    ? 'bg-primary text-white border-primary shadow-md'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:border-primary hover:bg-primary/5'
-                                  }
-                                `}
-                              >
-                                <input
-                                  type="radio"
-                                  name="garaje"
-                                  value={opcion}
-                                  checked={isSelected}
-                                  onChange={(e) => setDetallesPropiedad({ garaje: e.target.value })}
-                                  className="sr-only"
-                                />
-                                <span className="font-medium">{opcion === "0" ? "Sin garaje" : opcion}</span>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Estado <span className="text-red-500">*</span>
-                          </label>
-                          <Select value={detallesPropiedad.estado} onValueChange={(value) => setDetallesPropiedad({ estado: value })}>
-                            <SelectTrigger className="bg-gray-50 border-gray-300">
-                              <SelectValue placeholder="Sin Definir" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="sin-definir">Sin Definir</SelectItem>
-                              <SelectItem value="excelente">Excelente</SelectItem>
-                              <SelectItem value="muy-bueno">Muy Bueno</SelectItem>
-                              <SelectItem value="bueno">Bueno</SelectItem>
-                              <SelectItem value="regular">Regular</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Año de construcción
-                          </label>
-                          <Input
-                            type="number"
-                            value={detallesPropiedad.anoConstruccion}
-                            onChange={(e) => setDetallesPropiedad({ anoConstruccion: e.target.value })}
-                            className="bg-gray-50 border-gray-300"
-                            placeholder="Ej: 2020"
-                            min="1900"
-                            max={new Date().getFullYear()}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Cantidad de pisos
-                          </label>
-                          <Input
-                            type="number"
-                            value={detallesPropiedad.cantidadPisos}
-                            onChange={(e) => setDetallesPropiedad({ cantidadPisos: e.target.value })}
-                            className="bg-gray-50 border-gray-300"
-                            placeholder="Ej: 1"
-                            min="1"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-gray-700">Características adicionales</h4>
-
-                        <div className="space-y-3">
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={detallesPropiedad.aptoOficina}
-                              onChange={(e) => setDetallesPropiedad({ aptoOficina: e.target.checked })}
-                              className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
-                            />
-                            <div>
-                              <span className="text-sm font-medium text-gray-700">Apto para oficina</span>
-                              <p className="text-xs text-gray-500">Apto para funcionamiento profesional</p>
-                            </div>
-                          </label>
-
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={detallesPropiedad.viviendaSocial}
-                              onChange={(e) => setDetallesPropiedad({ viviendaSocial: e.target.checked })}
-                              className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
-                            />
-                            <div>
-                              <span className="text-sm font-medium text-gray-700">Vivienda social</span>
-                              <p className="text-xs text-gray-500">Plan de vivienda social o programa gubernamental</p>
-                            </div>
-                          </label>
-
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={detallesPropiedad.condominio}
-                              onChange={(e) => setDetallesPropiedad({ condominio: e.target.checked })}
-                              className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
-                            />
-                            <div>
-                              <span className="text-sm font-medium text-gray-700">En condominio</span>
-                              <p className="text-xs text-gray-500">La propiedad está dentro de un condominio privado</p>
-                            </div>
-                          </label>
                         </div>
                       </div>
 
@@ -993,22 +1238,31 @@ export function FormularioContent() {
                       transition={{ duration: 0.3 }}
                       className="space-y-6"
                     >
-                      <label className="flex items-center gap-2">
+                      <label
+                        className={`
+                          flex items-center justify-between gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all max-w-md
+                          ${confortSeguridad.noAplica ? 'bg-primary/5 border-primary' : 'bg-white border-gray-200 hover:border-primary/40'}
+                        `}
+                      >
+                        <div>
+                          <span className="text-sm font-semibold text-gray-700 block">La propiedad no tiene comodidades</span>
+                          <p className="text-xs text-gray-500">Marca esto si quieres saltar este paso</p>
+                        </div>
                         <input
                           type="checkbox"
                           checked={confortSeguridad.noAplica}
                           onChange={(e) => setConfortSeguridad({ noAplica: e.target.checked })}
+                          className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
                         />
-                        <span className="text-sm font-semibold text-gray-700">No aplica</span>
                       </label>
 
                       {!confortSeguridad.noAplica && (
                         <>
-                          <div>
+                          <div className="p-5 rounded-xl border border-gray-200">
                             <label className="block text-sm font-semibold text-gray-700 mb-3">
-                              Confort:
+                              Comodidades (confort)
                             </label>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                               {[
                                 { value: 'aire-acondicionado', label: 'Aire Acondicionado' },
                                 { value: 'calefaccion', label: 'Calefacción' },
@@ -1019,35 +1273,43 @@ export function FormularioContent() {
                                 { value: 'gimnasio', label: 'Gimnasio' },
                                 { value: 'sauna', label: 'Sauna' },
                                 { value: 'jacuzzi', label: 'Jacuzzi' },
-                              ].map((opcion) => (
-                                <label key={opcion.value} className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={confortSeguridad.confort.includes(opcion.value)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setConfortSeguridad({
-                                          confort: [...confortSeguridad.confort, opcion.value]
-                                        })
-                                      } else {
+                              ].map((opcion) => {
+                                const checked = confortSeguridad.confort.includes(opcion.value)
+                                return (
+                                  <button
+                                    key={opcion.value}
+                                    type="button"
+                                    onClick={() => {
+                                      if (checked) {
                                         setConfortSeguridad({
                                           confort: confortSeguridad.confort.filter(c => c !== opcion.value)
                                         })
+                                      } else {
+                                        setConfortSeguridad({
+                                          confort: [...confortSeguridad.confort, opcion.value]
+                                        })
                                       }
                                     }}
-                                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                                  />
-                                  <span className="text-sm">{opcion.label}</span>
-                                </label>
-                              ))}
+                                    className={`
+                                      px-3 py-2 rounded-lg border-2 text-sm text-left transition-all
+                                      ${checked
+                                        ? 'bg-primary/5 border-primary text-primary font-medium'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:border-primary/40'
+                                      }
+                                    `}
+                                  >
+                                    {checked && '✓ '}{opcion.label}
+                                  </button>
+                                )
+                              })}
                             </div>
                           </div>
 
-                          <div>
+                          <div className="p-5 rounded-xl border border-gray-200">
                             <label className="block text-sm font-semibold text-gray-700 mb-3">
-                              Seguridad:
+                              Seguridad
                             </label>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                               {[
                                 { value: 'seguridad-24h', label: 'Seguridad 24hs' },
                                 { value: 'porton-electrico', label: 'Portón Eléctrico' },
@@ -1055,27 +1317,35 @@ export function FormularioContent() {
                                 { value: 'alarma', label: 'Alarma' },
                                 { value: 'guardia', label: 'Guardia' },
                                 { value: 'cercado', label: 'Cercado' },
-                              ].map((opcion) => (
-                                <label key={opcion.value} className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={confortSeguridad.seguridad.includes(opcion.value)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setConfortSeguridad({
-                                          seguridad: [...confortSeguridad.seguridad, opcion.value]
-                                        })
-                                      } else {
+                              ].map((opcion) => {
+                                const checked = confortSeguridad.seguridad.includes(opcion.value)
+                                return (
+                                  <button
+                                    key={opcion.value}
+                                    type="button"
+                                    onClick={() => {
+                                      if (checked) {
                                         setConfortSeguridad({
                                           seguridad: confortSeguridad.seguridad.filter(s => s !== opcion.value)
                                         })
+                                      } else {
+                                        setConfortSeguridad({
+                                          seguridad: [...confortSeguridad.seguridad, opcion.value]
+                                        })
                                       }
                                     }}
-                                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                                  />
-                                  <span className="text-sm">{opcion.label}</span>
-                                </label>
-                              ))}
+                                    className={`
+                                      px-3 py-2 rounded-lg border-2 text-sm text-left transition-all
+                                      ${checked
+                                        ? 'bg-primary/5 border-primary text-primary font-medium'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:border-primary/40'
+                                      }
+                                    `}
+                                  >
+                                    {checked && '✓ '}{opcion.label}
+                                  </button>
+                                )
+                              })}
                             </div>
                           </div>
                         </>
@@ -1212,6 +1482,7 @@ export function FormularioContent() {
                         onEditarPaso={setPasoActual}
                         onPublicar={handleSubmit}
                         publishing={publishing}
+                        modoEdicion={Boolean(editPropertyId)}
                       />
 
                       <div className="flex justify-between pt-4">
@@ -1230,7 +1501,7 @@ export function FormularioContent() {
 
       {!isAdmin && <Footer />}
 
-      {/* Diálogo de confirmación para cancelar */}
+      {/* Diálogo de confirmación para descartar */}
       <AlertDialog open={mostrarDialogoCancelar} onOpenChange={setMostrarDialogoCancelar}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
@@ -1238,12 +1509,26 @@ export function FormularioContent() {
               <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
-              <AlertDialogTitle>¿Cancelar publicación?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {editPropertyId ? "¿Descartar cambios?" : "¿Descartar borrador?"}
+              </AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-base mt-4">
-              Esta acción descartará todos los datos ingresados y no podrás recuperar la publicación.
+              {editPropertyId ? (
+                <>
+                  Los cambios que no hayas guardado se perderán.
+                  <br /><br />
+                  Tu aviso actual <strong>se mantiene publicado tal como está</strong>. Esta acción no elimina ninguna propiedad.
+                </>
+              ) : (
+                <>
+                  Se perderán los datos que hayas ingresado en este formulario.
+                  <br /><br />
+                  Aún no has publicado nada: esta acción <strong>no elimina ninguna propiedad</strong>.
+                </>
+              )}
               <br /><br />
-              <strong>¿Estás seguro de que deseas cancelar?</strong>
+              <strong>¿Estás seguro de que deseas continuar?</strong>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4">
@@ -1254,7 +1539,7 @@ export function FormularioContent() {
               onClick={confirmarCancelar}
               className="bg-red-600 hover:bg-red-700 mt-0"
             >
-              Sí, cancelar publicación
+              {editPropertyId ? "Sí, descartar cambios" : "Sí, descartar borrador"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

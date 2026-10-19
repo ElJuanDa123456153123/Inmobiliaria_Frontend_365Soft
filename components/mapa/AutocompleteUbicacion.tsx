@@ -114,6 +114,14 @@ export default function AutocompleteUbicacion({
     setDebounceTimer(nuevoTimer)
   }
 
+  // Enter → seleccionar la primera sugerencia (busca y mueve el mapa directo)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && sugerencias.length > 0) {
+      e.preventDefault()
+      handleSeleccionarSugerencia(sugerencias[0])
+    }
+  }
+
   // Seleccionar una sugerencia
   const handleSeleccionarSugerencia = (sugerencia: Sugerencia) => {
     const lat = parseFloat(sugerencia.lat)
@@ -159,6 +167,7 @@ export default function AutocompleteUbicacion({
           type="text"
           value={busqueda}
           onChange={handleChange}
+          onKeyDown={handleKeyDown}
           onFocus={(e) => {
             if (sugerencias.length > 0) {
               setMostrarSugerencias(true)
@@ -201,7 +210,7 @@ export default function AutocompleteUbicacion({
       {/* Mensaje de ayuda */}
       {!busqueda && (
         <p className="text-xs text-gray-500 mt-2">
-          Escribe una ciudad, zona o dirección para ver sugerencias
+          Escribe una ciudad, zona o dirección (Enter selecciona la primera sugerencia y mueve el mapa)
         </p>
       )}
     </div>

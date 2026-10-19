@@ -23,6 +23,8 @@ interface UserProfile {
   direccion?: string
   ci?: string
   avatar_url?: string
+  qr_pago_url?: string
+  qrs_cobro?: { plataforma: string; url: string }[]
   nombre_inmobiliaria?: string
   nit?: string
   verificado: boolean
@@ -155,6 +157,11 @@ interface Property {
   vendedor_telefono?: string
   vendedor_contacto?: string
   vendedor_horario?: string
+  // Disponibilidad de visitas actual del vendedor (calculada por el backend)
+  vendedor_disponibilidad?: {
+    duracion_min: number
+    horarios: Record<string, { desde: string; hasta: string }[]>
+  }
   mostrar_vendedor?: boolean // Toggle para mostrar/ocultar vendedor (default: false = 365Soft)
   mostrar_agencia?: boolean // Toggle para mostrar/ocultar agencia (default: false = 365Soft)
   agencia_nombre_personalizado?: string // Nombre personalizado para la agencia
@@ -287,6 +294,28 @@ class ApiService {
     return this.handleResponse(response)
   }
 
+  // Guardar o quitar ("" para eliminar) el QR de cobros del usuario
+  async actualizarQrPago(qrPagoUrl: string): Promise<{ message: string; qr_pago_url: string }> {
+    const response = await fetch(`${getApiUrl()}/api/auth/qr-pago`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ qr_pago_url: qrPagoUrl }),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Guardar la lista de QRs de cobro por plataforma (Yape, Plin, BNB...)
+  async actualizarQrsCobro(qrs: { plataforma: string; url: string }[]): Promise<{ message: string; qrs_cobro: { plataforma: string; url: string }[] }> {
+    const response = await fetch(`${getApiUrl()}/api/auth/qrs-cobro`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ qrs }),
+    })
+
+    return this.handleResponse(response)
+  }
+
   // === PROPIEDADES ===
 
   // Subir una imagen individual
@@ -370,6 +399,17 @@ class ApiService {
   async createProperty(data: CreatePropertyRequest): Promise<{ message: string; property: Property }> {
     const response = await fetch(`${getApiUrl()}/api/properties`, {
       method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+
+    return this.handleResponse(response)
+  }
+
+  // Actualizar una propiedad existente (solo el dueño)
+  async updateProperty(id: number, data: Partial<CreatePropertyRequest>): Promise<{ message: string; property: Property }> {
+    const response = await fetch(`${getApiUrl()}/api/properties/${id}`, {
+      method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     })
@@ -906,6 +946,30 @@ class ApiService {
   getContratoPdfUrl(contractId: number): string {
     return `${getApiUrl()}/api/contracts/${contractId}/pdf`
   }
+
+  // Obtener el PDF autenticado y abrirlo (visor) o descargarlo.
+  // Un <a href> plano no envía el token JWT → 401, por eso se usa fetch + blob.
+  async abrirContratoPdf(contractId: number, download = false): Promise<void> {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    const res = await fetch(`${this.getContratoPdfUrl(contractId)}${download ? "?download=1" : ""}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+    if (!res.ok) throw new Error("No se pudo generar el PDF del contrato")
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    if (download) {
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `contrato-${contractId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } else {
+      window.open(url, "_blank")
+    }
+    // Liberar el blob cuando el visor ya lo cargó
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
 }
 
 // Interface para planes de suscripción
@@ -1071,6 +1135,8 @@ export interface RentalContract {
     apellido: string
     email: string
     telefono: string
+    qr_pago_url?: string
+    qrs_cobro?: { plataforma: string; url: string }[]
   }
 }
 
@@ -1088,6 +1154,15 @@ export interface RentPayment {
   estado: 'pendiente' | 'pagado' | 'atrasado'
   comprobante_url: string
   contract?: RentalContract
+  vendedor?: {
+    id: number
+    nombre: string
+    apellido?: string
+    email?: string
+    telefono?: string
+    qr_pago_url?: string
+    qrs_cobro?: { plataforma: string; url: string }[]
+  }
 }
 
 export interface TenantSummary extends RentalContract {

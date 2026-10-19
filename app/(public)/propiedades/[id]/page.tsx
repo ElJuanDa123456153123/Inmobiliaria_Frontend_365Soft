@@ -22,11 +22,14 @@ import {
   Image as ImageIcon,
   Paperclip,
   Download,
+  Eye,
+  Pencil,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { apiService, Property } from "@/lib/services/api"
+import { getUserIdFromToken } from "@/lib/user-prefs"
 import { toast } from "sonner"
 import { getImageUrl } from "@/lib/utils"
 import dynamic from "next/dynamic"
@@ -59,6 +62,7 @@ export default function PropertyDetailPage() {
   const [property, setProperty] = useState<Property | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [esPropietario, setEsPropietario] = useState(false)
 
   // Estados para el modal de chat
   const [modalChatAbierto, setModalChatAbierto] = useState(false)
@@ -80,6 +84,16 @@ export default function PropertyDetailPage() {
   const [telefonoVisita, setTelefonoVisita] = useState("")
   const [horarioVisita, setHorarioVisita] = useState("")
   const [enviandoVisita, setEnviandoVisita] = useState(false)
+  const [yaTieneVisitaPendiente, setYaTieneVisitaPendiente] = useState(false)
+  // Agenda dinámica: disponibilidad del vendedor (horarios por día) + slot elegido
+  const [disponibilidad, setDisponibilidad] = useState<{
+    duracion_min: number
+    horarios: Record<string, { desde: string; hasta: string }[]>
+    ocupadas: string[]
+  } | null>(null)
+  const [fechaSeleccionada, setFechaSeleccionada] = useState("")
+  const [slotSeleccionado, setSlotSeleccionado] = useState("")
+  const [limiteFechas, setLimiteFechas] = useState(10)
 
   // Estados para el modal de solicitud de alquiler
   const [modalAlquilerAbierto, setModalAlquilerAbierto] = useState(false)
@@ -156,13 +170,40 @@ export default function PropertyDetailPage() {
         const data = await response.json()
         // Validar que data.messages sea un array
         if (Array.isArray(data.messages)) {
-          setChatMessages(data.messages.filter((m: ChatMessage) => m && m.id))
+          const delHilo = data.messages.filter((m: ChatMessage) => m && m.id)
+          // Merge (no overwrite): evita perder mensajes enviados mientras cargaba el hilo
+          setChatMessages(prev => {
+            const vistos = new Set<number>()
+            const combinados = [...delHilo, ...prev].filter((m) => {
+              if (!m || !m.id || vistos.has(m.id)) return false
+              vistos.add(m.id)
+              return true
+            })
+            return combinados.sort((a, b) =>
+              new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+            )
+          })
         }
       }
     } catch (error) {
       console.error("Error cargando mensajes:", error)
       toast.error("Error al cargar mensajes")
     }
+  }
+
+  // Insertar un mensaje en el chat evitando duplicados:
+  // 1) por id (POST y WebSocket devuelven el mismo registro)
+  // 2) por firma de contenido (si el id llegara a diferir entre eventos)
+  const mergeMensaje = (msg: ChatMessage) => {
+    if (!msg || !msg.id) return
+    setChatMessages(prev => {
+      if (prev.some(m => m.id === msg.id)) return prev
+      const firma = (m: ChatMessage) =>
+        `${m.de_user_id}|${m.para_user_id}|${m.mensaje}|${m.created_at ? new Date(m.created_at).toISOString().slice(0, 16) : ""}`
+      const firmaMsg = firma(msg)
+      if (prev.some(m => firma(m) === firmaMsg)) return prev
+      return [...prev, msg]
+    })
   }
 
   // Función para enviar mensaje en el modal
@@ -209,7 +250,7 @@ export default function PropertyDetailPage() {
 
         // El backend devuelve "mensaje" (en español), no "message"
         if (data.mensaje && data.mensaje.id) {
-          setChatMessages(prev => [...prev, data.mensaje])
+          mergeMensaje(data.mensaje)
           setNuevoMensaje("")
           toast.success("Mensaje enviado")
         } else {
@@ -296,10 +337,7 @@ export default function PropertyDetailPage() {
       if (sendResponse.ok) {
         const data = await sendResponse.json()
         if (data.mensaje && data.mensaje.id) {
-          setChatMessages(prev => {
-            if (prev.some(m => m.id === data.mensaje.id)) return prev
-            return [...prev, data.mensaje]
-          })
+          mergeMensaje(data.mensaje)
         }
         setTimeout(() => {
           const container = document.getElementById("chat-messages-container")
@@ -321,14 +359,105 @@ export default function PropertyDetailPage() {
   }
 
   // Función para abrir modal de solicitud de visita
-  const abrirModalVisita = () => {
+  const abrirModalVisita = async () => {
     const token = localStorage.getItem("token")
     if (!token) {
       toast.error("Debes iniciar sesión para solicitar una visita")
       router.push(`/ingresar?redirect=/propiedades/${params.id}`)
       return
     }
+    if (yaTieneVisitaPendiente) {
+      toast.info("Ya tienes una visita pendiente para esta propiedad")
+      return
+    }
+
+    // Cargar disponibilidad del vendedor (días, franjas, ocupados)
+    setDisponibilidad(null)
+    setFechaSeleccionada("")
+    setSlotSeleccionado("")
     setModalVisitaAbierto(true)
+    try {
+      const res = await fetch(`${API_URL}/api/panel/visits/availability/${property?.id}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+        cache: "no-store",
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setDisponibilidad({
+          duracion_min: data.duracion_min || 60,
+          horarios: data.horarios || {},
+          ocupadas: data.ocupadas || [],
+        })
+      }
+    } catch {
+      // Sin disponibilidad se muestra aviso y el usuario puede escribir su preferencia manual
+    }
+  }
+
+  // Días de la semana que el vendedor atiende (con franjas configuradas)
+  const diasAtendidos = (): number[] => {
+    if (!disponibilidad) return [1, 2, 3, 4, 5, 6]
+    return Object.keys(disponibilidad.horarios)
+      .filter((d) => (disponibilidad.horarios[d]?.length ?? 0) > 0)
+      .map(Number)
+  }
+
+  // Fechas disponibles: próximos días según disponibilidad del vendedor.
+  // Muestra hasta limiteFechas (paginación con "Ver más/menos fechas" hasta 90 días).
+  const generarFechasDisponibles = () => {
+    const dias = diasAtendidos()
+    const fechas: Date[] = []
+    const hoy = new Date()
+    for (let i = 1; fechas.length < limiteFechas && i <= 90; i++) {
+      const d = new Date(hoy)
+      d.setDate(hoy.getDate() + i)
+      if (dias.includes(d.getDay())) fechas.push(d)
+    }
+    return fechas
+  }
+
+  const totalFechasEn90Dias = () => {
+    const dias = diasAtendidos()
+    const hoy = new Date()
+    let total = 0
+    for (let i = 1; i <= 90; i++) {
+      const d = new Date(hoy)
+      d.setDate(hoy.getDate() + i)
+      if (dias.includes(d.getDay())) total++
+    }
+    return total
+  }
+
+  // Horarios del día elegido: franjas configuradas para ese día de la semana,
+  // en pasos de duracion_min, excluyendo ocupados y horarios ya pasados
+  const generarSlotsDisponibles = () => {
+    if (!disponibilidad || !fechaSeleccionada) return []
+    const duracion = disponibilidad.duracion_min || 60
+    const slots: string[] = []
+    const ahora = new Date()
+    const esHoy = fechaSeleccionada === ahora.toISOString().slice(0, 10)
+
+    // Día de la semana de la fecha elegida ("0"=Dom .. "6"=Sáb)
+    const [y, m, d] = fechaSeleccionada.split("-").map(Number)
+    const diaSemana = new Date(y, m - 1, d).getDay()
+    const franjas = disponibilidad.horarios[String(diaSemana)] || []
+
+    for (const rango of franjas) {
+      const [hDesde, mDesde] = rango.desde.split(":").map(Number)
+      const [hHasta, mHasta] = rango.hasta.split(":").map(Number)
+      let minutos = hDesde * 60 + mDesde
+      const fin = hHasta * 60 + mHasta
+      while (minutos + duracion <= fin) {
+        const hh = String(Math.floor(minutos / 60)).padStart(2, "0")
+        const mm = String(minutos % 60).padStart(2, "0")
+        const slot = `${hh}:${mm}`
+        const ocupado = disponibilidad.ocupadas?.some(o => o === `${fechaSeleccionada} ${slot}`)
+        const pasado = esHoy && minutos <= ahora.getHours() * 60 + ahora.getMinutes()
+        if (!ocupado && !pasado) slots.push(slot)
+        minutos += duracion
+      }
+    }
+    return slots
   }
 
   // Función para enviar solicitud de visita
@@ -336,8 +465,12 @@ export default function PropertyDetailPage() {
     e.preventDefault()
 
     if (!property) return
-    if (!nombreVisita.trim() || !telefonoVisita.trim() || !horarioVisita) {
-      toast.error("Por favor completa todos los campos")
+    if (!nombreVisita.trim() || !telefonoVisita.trim()) {
+      toast.error("Por favor completa tu nombre y teléfono")
+      return
+    }
+    if (!fechaSeleccionada || !slotSeleccionado) {
+      toast.error("Selecciona el día y el horario de tu visita")
       return
     }
 
@@ -355,19 +488,20 @@ export default function PropertyDetailPage() {
           property_id: property.id,
           nombre_completo: nombreVisita,
           telefono: telefonoVisita,
-          horario_preferido: horarioVisita
+          horario_preferido: `${fechaSeleccionada} ${slotSeleccionado}`,
+          fecha_visita: `${fechaSeleccionada} ${slotSeleccionado}`
         })
       })
 
       if (response.ok) {
         toast.success("Solicitud de visita enviada correctamente")
         setModalVisitaAbierto(false)
-        setNombreVisita("")
-        setTelefonoVisita("")
-        setHorarioVisita("")
+        setYaTieneVisitaPendiente(true)
       } else {
         const errData = await response.json().catch(() => ({ error: "Error al enviar solicitud" }))
         toast.error(errData.error || "Error al enviar solicitud")
+        // Si ya tenía una pendiente (409), refrescar el estado del botón
+        if (response.status === 409) setYaTieneVisitaPendiente(true)
       }
     } catch (error) {
       console.error("Error solicitando visita:", error)
@@ -431,6 +565,25 @@ export default function PropertyDetailPage() {
         if (!userResponse.ok) return
         const userData = await userResponse.json()
         setCurrentUserId(userData.user?.id || null)
+        // Autollenado del formulario de visita con los datos de la cuenta
+        setNombreVisita([userData.user?.nombre, userData.user?.apellido].filter(Boolean).join(" ") || "")
+        setTelefonoVisita(userData.user?.telefono || "")
+      } catch {
+        // silencioso
+      }
+
+      // ¿Ya tiene una visita pendiente para esta propiedad? → ocultar botón de agendar
+      try {
+        const visitsResponse = await fetch(`${API_URL}/api/panel/visits/my`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        })
+        if (visitsResponse.ok) {
+          const visitsData = await visitsResponse.json()
+          const tienePendiente = (visitsData.visits || []).some(
+            (v: any) => String(v.property_id) === String(params.id) && v.estado === "pendiente"
+          )
+          setYaTieneVisitaPendiente(tienePendiente)
+        }
       } catch {
         // silencioso
       }
@@ -532,12 +685,7 @@ export default function PropertyDetailPage() {
             const esDeLaPropiedad = !mensaje.property_id || mensaje.property_id === propId
 
             if (esDeLaConversacion && esDeLaPropiedad) {
-              setChatMessages(prev => {
-                if (prev.some(m => m.id === mensaje.id)) {
-                  return prev
-                }
-                return [...prev, mensaje]
-              })
+              mergeMensaje(mensaje)
               setTimeout(() => {
                 const messagesContainer = document.getElementById("chat-messages-container")
                 if (messagesContainer) {
@@ -616,6 +764,27 @@ export default function PropertyDetailPage() {
     fetchProperty()
   }, [params.id, router])
 
+  // Detectar si el visitante es el dueño del aviso → barra de propietario
+  useEffect(() => {
+    if (!property) return
+    const userId = getUserIdFromToken()
+    setEsPropietario(Boolean(userId && Number(userId) === property.user_id))
+  }, [property])
+
+  // Lista de días activos con sus franjas (para el bloque "Días de disponibilidad")
+  const disponibilidadVendedorLista = () => {
+    const disp = property?.vendedor_disponibilidad
+    if (!disp?.horarios) return []
+    const orden = ["1", "2", "3", "4", "5", "6", "0"]
+    const labels: Record<string, string> = { "0": "Domingo", "1": "Lunes", "2": "Martes", "3": "Miércoles", "4": "Jueves", "5": "Viernes", "6": "Sábado" }
+    return orden
+      .filter((d) => (disp.horarios[d]?.length ?? 0) > 0)
+      .map((d) => ({
+        dia: labels[d],
+        franjas: disp.horarios[d].map((f) => `${f.desde.slice(0, 5)} - ${f.hasta.slice(0, 5)}`).join(" y "),
+      }))
+  }
+
   // Formatear precio
   const formatPrice = () => {
     if (!property) return ''
@@ -674,6 +843,48 @@ export default function PropertyDetailPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
+
+      {/* Barra de propietario: solo la ve el dueño del aviso */}
+      {esPropietario && (
+        <div className="bg-primary text-white shadow-md border-b border-black/10">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Eye className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-bold leading-tight">
+                  Estás viendo tu aviso como lo ven los compradores
+                </p>
+                <p className="text-xs text-white/80">
+                  Vista previa · visible solo para ti
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/panel/propiedades">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-white/60 bg-transparent text-white hover:bg-white/15 hover:text-white font-semibold"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Volver al panel
+                </Button>
+              </Link>
+              <Link href={`/publicar/formulario?edit=${property.id}`}>
+                <Button
+                  size="sm"
+                  className="bg-white text-primary hover:bg-white/90 font-bold shadow"
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Editar aviso
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1">
         {/* Breadcrumb */}
@@ -1121,24 +1332,42 @@ export default function PropertyDetailPage() {
                             onClick={() => iniciarConversacion(property.user_id, property.id)}
                           >
                             <MessageSquare className="h-4 w-4 mr-2" />
-                            Enviar mensaje
+                            Preguntar al vendedor
                           </Button>
                         )}
-                        <Button
-                          className="w-full"
-                          variant="outline"
-                          size="lg"
-                          onClick={abrirModalVisita}
-                        >
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Solicitar Visita
-                        </Button>
-                        <Button className="w-full" variant="outline" size="lg">
-                          <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                          </svg>
-                          WhatsApp
-                        </Button>
+                        {yaTieneVisitaPendiente ? (
+                          <div className="w-full bg-amber-50 text-amber-700 border border-amber-200 rounded-lg px-4 py-3 text-sm text-center font-medium">
+                            📅 Ya tienes una visita pendiente para esta propiedad
+                          </div>
+                        ) : (
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            size="lg"
+                            onClick={abrirModalVisita}
+                          >
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Agendar Visita
+                          </Button>
+                        )}
+                        {property.vendedor_telefono && (
+                          <Button
+                            className="w-full bg-[#25D366] hover:bg-[#1eb856] text-white border-0"
+                            size="lg"
+                            asChild
+                          >
+                            <a
+                              href={`https://wa.me/591${property.vendedor_telefono.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola, me interesa esta propiedad: ${property.titulo}`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                              </svg>
+                              WhatsApp
+                            </a>
+                          </Button>
+                        )}
                       </div>
 
                       <div className="pt-4 border-t border-border space-y-2 text-sm">
@@ -1148,11 +1377,30 @@ export default function PropertyDetailPage() {
                             <span>{property.vendedor_telefono}</span>
                           </div>
                         )}
-                        {property.vendedor_horario && (
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Calendar className="h-4 w-4" />
-                            <span>{property.vendedor_horario}</span>
+                        {disponibilidadVendedorLista().length > 0 ? (
+                          <div className="rounded-lg border border-border bg-muted/40 p-3">
+                            <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                              <Calendar className="h-3.5 w-3.5" />
+                              Días de disponibilidad
+                            </div>
+                            <div className="space-y-1.5">
+                              {disponibilidadVendedorLista().map((d) => (
+                                <div key={d.dia} className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-medium text-foreground">{d.dia}</span>
+                                  <span className="text-xs text-muted-foreground">{d.franjas}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
+                        ) : (
+                          property.vendedor_horario && (
+                            <div className="flex items-start gap-2 text-muted-foreground">
+                              <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              <span className="text-xs leading-snug">
+                                Atiende: {property.vendedor_horario}
+                              </span>
+                            </div>
+                          )
                         )}
                       </div>
                     </div>
@@ -1182,7 +1430,8 @@ export default function PropertyDetailPage() {
             {/* Header del modal */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-lg">
               <div>
-                <h3 className="font-semibold text-gray-900">Chat con {chatVendedorNombre}</h3>
+                <h3 className="font-semibold text-gray-900">Consultas de la propiedad</h3>
+                <p className="text-xs text-gray-500">Conversa con {chatVendedorNombre}</p>
                 {property && (
                   <p className="text-sm text-gray-600">{property.titulo}</p>
                 )}
@@ -1199,8 +1448,8 @@ export default function PropertyDetailPage() {
             <div id="chat-messages-container" className="flex-1 overflow-y-auto p-4 space-y-3">
               {chatMessages.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
-                  <p>No hay mensajes aún</p>
-                  <p className="text-sm mt-1">¡Sé el primero en saludar!</p>
+                  <p>No hay consultas aún</p>
+                  <p className="text-sm mt-1">Haz tu primera consulta sobre esta propiedad</p>
                 </div>
               ) : (
                 chatMessages.map((message, index) => {
@@ -1455,98 +1704,219 @@ export default function PropertyDetailPage() {
 
       {/* Modal de Solicitud de Visita */}
       {modalVisitaAbierto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Solicitar Visita
-                </h3>
-                <button
-                  onClick={() => setModalVisitaAbierto(false)}
-                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-start justify-between gap-4 bg-gray-50 rounded-t-2xl">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">Agendar Visita</h3>
+                {property && (
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    {property.titulo}
+                    <span className="block text-xs text-gray-500">
+                      Agenda de {property.vendedor_nombre} (vendedor)
+                    </span>
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setModalVisitaAbierto(false)}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSolicitarVisita} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto p-6 grid md:grid-cols-2 gap-6">
+                {/* Columna izquierda: datos del interesado + resumen */}
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+                    <p className="text-xs text-primary font-medium flex items-center gap-1">
+                      ✓ Datos verificados de tu cuenta (no editables, evita fraudes)
+                    </p>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Nombre completo
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={nombreVisita}
+                          readOnly
+                          placeholder="Juan Pérez"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 text-sm cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Teléfono
+                      </label>
+                      <input
+                        type="tel"
+                        value={telefonoVisita}
+                        readOnly
+                        placeholder="77712345"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 text-sm cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Resumen de la selección */}
+                  <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
+                      Tu visita
+                    </p>
+                    {fechaSeleccionada && slotSeleccionado ? (
+                      <p className="text-sm text-gray-800">
+                        <span className="font-semibold">
+                          {new Date(`${fechaSeleccionada}T12:00:00`).toLocaleDateString("es-BO", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                          })}
+                        </span>
+                        <span className="block mt-0.5">
+                          A las <strong>{slotSeleccionado}</strong> ({disponibilidad?.duracion_min || 60} min aprox.)
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        Elige día y horario de la agenda del vendedor →
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+                      El vendedor recibirá tu propuesta y podrá confirmarla, reprogramarla o rechazarla. Te avisamos por notificación y correo.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Columna derecha: agenda */}
+                <div className="space-y-5">
+                  {!disponibilidad ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 py-8 justify-center">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando horarios disponibles...
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          1. Elige el día
+                        </label>
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                          {generarFechasDisponibles().map((fecha) => {
+                            const iso = fecha.toISOString().slice(0, 10)
+                            const isSelected = fechaSeleccionada === iso
+                            const diasSemana = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+                            const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+                            return (
+                              <button
+                                key={iso}
+                                type="button"
+                                onClick={() => {
+                                  setFechaSeleccionada(iso)
+                                  setSlotSeleccionado("")
+                                }}
+                                className={`
+                                  flex flex-col items-center px-3 py-2 rounded-lg border-2 min-w-[64px] transition-all
+                                  ${isSelected
+                                    ? "bg-primary text-white border-primary shadow"
+                                    : "bg-white text-gray-600 border-gray-200 hover:border-primary/50"
+                                  }
+                                `}
+                              >
+                                <span className="text-[10px] uppercase">{diasSemana[fecha.getDay()]}</span>
+                                <span className="text-lg font-bold leading-none">{fecha.getDate()}</span>
+                                <span className="text-[10px]">{meses[fecha.getMonth()]}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          {totalFechasEn90Dias() > limiteFechas && (
+                            <button
+                              type="button"
+                              onClick={() => setLimiteFechas((prev) => Math.min(prev + 10, 90))}
+                              className="text-xs text-primary hover:underline"
+                            >
+                              Ver más fechas →
+                            </button>
+                          )}
+                          {limiteFechas > 10 && (
+                            <button
+                              type="button"
+                              onClick={() => setLimiteFechas(10)}
+                              className="text-xs text-gray-400 hover:text-gray-600 hover:underline"
+                            >
+                              Ver menos
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          2. Elige el horario <span className="text-xs text-gray-400">({disponibilidad.duracion_min} min)</span>
+                        </label>
+                        {!fechaSeleccionada ? (
+                          <p className="text-xs text-gray-500">Selecciona primero un día</p>
+                        ) : generarSlotsDisponibles().length === 0 ? (
+                          <p className="text-xs text-gray-500">No hay horarios libres este día. Prueba con otro.</p>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2">
+                            {generarSlotsDisponibles().map((slot) => {
+                              const isSelected = slotSeleccionado === slot
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  onClick={() => setSlotSeleccionado(slot)}
+                                  className={`
+                                    px-2 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                                    ${isSelected
+                                      ? "bg-primary text-white border-primary shadow"
+                                      : "bg-white text-gray-600 border-gray-200 hover:border-primary/50"
+                                    }
+                                  `}
+                                >
+                                  {slot}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {property && (
-                <p className="text-sm text-gray-600 mb-4">
-                  Propiedad: <strong>{property.titulo}</strong>
-                </p>
-              )}
-
-              <form onSubmit={handleSolicitarVisita} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tu nombre completo *
-                  </label>
-                  <input
-                    type="text"
-                    value={nombreVisita}
-                    onChange={(e) => setNombreVisita(e.target.value)}
-                    placeholder="Juan Pérez"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tu teléfono *
-                  </label>
-                  <input
-                    type="tel"
-                    value={telefonoVisita}
-                    onChange={(e) => setTelefonoVisita(e.target.value)}
-                    placeholder="77712345"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Horario preferido *
-                  </label>
-                  <select
-                    value={horarioVisita}
-                    onChange={(e) => setHorarioVisita(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Selecciona un horario</option>
-                    <option value="Mañana (9:00 - 12:00)">Mañana (9:00 - 12:00)</option>
-                    <option value="Tarde (14:00 - 18:00)">Tarde (14:00 - 18:00)</option>
-                    <option value="Sábado">Sábado</option>
-                    <option value="Domingo">Domingo</option>
-                  </select>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setModalVisitaAbierto(false)}
-                    disabled={enviandoVisita}
-                    className="flex-1"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={enviandoVisita}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  >
-                    {enviandoVisita ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      "Enviar Solicitud"
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </div>
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setModalVisitaAbierto(false)}
+                  disabled={enviandoVisita}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={enviandoVisita || !fechaSeleccionada || !slotSeleccionado}
+                  className="flex-1"
+                >
+                  {enviandoVisita ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Solicitar Visita"
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

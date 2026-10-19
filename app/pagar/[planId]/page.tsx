@@ -16,13 +16,14 @@ import {
   Info,
   RefreshCw,
   Download,
+  XCircle,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import PaymentWizard, { PaymentStep } from "@/components/payment/PaymentWizard"
+import PaymentWizard, { PaymentStep, StepConfig } from "@/components/payment/PaymentWizard"
 import PaymentMethodSelector, { PaymentMethod } from "@/components/payment/PaymentMethodSelector"
 import ProofUploader from "@/components/payment/ProofUploader"
 import CodeSnippet from "@/components/payment/CodeSnippet"
@@ -46,6 +47,24 @@ export default function PagarPage() {
   const [creatingPayment, setCreatingPayment] = useState(false)
   const [paymentCompleted, setPaymentCompleted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [expirado, setExpirado] = useState(false)
+  const [cancelandoQr, setCancelandoQr] = useState(false)
+
+  // Pasos del wizard para el flujo QR: 2 pasos, sin "Confirmar" manual
+  const qrSteps: StepConfig[] = [
+    {
+      id: 'method',
+      title: 'Método de Pago',
+      description: 'Selecciona cómo pagar',
+      icon: CreditCard,
+    },
+    {
+      id: 'proof',
+      title: 'Escanear y Pagar',
+      description: 'Verificación automática',
+      icon: QrCode,
+    },
+  ]
 
   // Para comprobante
   const [proofFile, setProofFile] = useState<File | null>(null)
@@ -81,9 +100,9 @@ export default function PagarPage() {
     }
   }, [planId, router])
 
-  // Iniciar polling de pago (solo para QR)
+  // Iniciar polling de pago (solo para QR, apenas se muestra el QR)
   useEffect(() => {
-    if (paymentType === 'qr' && qrPago && currentStep === 'confirm') {
+    if (paymentType === 'qr' && qrPago && currentStep === 'proof') {
       startPolling(qrPago.id)
     }
 
@@ -124,13 +143,60 @@ export default function PagarPage() {
 
       if (diff <= 0) {
         setTimeLeft(0)
+        setExpirado(true)
         if (timerRef.current) clearInterval(timerRef.current)
-        toast.error("El tiempo ha expirado")
+        if (pollingRef.current) clearInterval(pollingRef.current)
         return
       }
 
       setTimeLeft(diff)
     }, 1000)
+  }
+
+  // Cancelar el QR activo: lo inhabilita en el banco y vuelve al paso 1
+  const handleCancelarQr = async () => {
+    if (!qrPago) return
+    setCancelandoQr(true)
+    try {
+      await apiService.cancelPayment(qrPago.id)
+      toast.info("Pago cancelado. El QR fue inhabilitado")
+    } catch {
+      toast.error("No se pudo cancelar el QR, intenta de nuevo")
+      setCancelandoQr(false)
+      return
+    } finally {
+      if (pollingRef.current) clearInterval(pollingRef.current)
+      if (timerRef.current) clearInterval(timerRef.current)
+      setQrPago(null)
+      setTimeLeft(15 * 60)
+      setExpirado(false)
+    }
+    setCancelandoQr(false)
+    setCurrentStep('method')
+  }
+
+  // Generar un nuevo QR cuando el anterior expiró
+  const handleRegenerarQr = async () => {
+    if (qrPago) {
+      // Inhabilitar el QR vencido (best-effort)
+      apiService.cancelPayment(qrPago.id).catch(() => {})
+    }
+    try {
+      setCreatingPayment(true)
+      setExpirado(false)
+      const paymentData = await apiService.createPayment({
+        property_id: 0,
+        plan_id: Number(planId),
+      })
+      setQrPago(paymentData)
+      setTimeLeft(15 * 60)
+      startTimer(paymentData.fecha_vencimiento)
+    } catch (error: any) {
+      toast.error(error.message || "Error al generar un nuevo QR")
+      setExpirado(true)
+    } finally {
+      setCreatingPayment(false)
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -168,12 +234,9 @@ export default function PagarPage() {
         setCurrentStep('proof')
       }
     } else if (currentStep === 'proof') {
-      // Avanzar a confirmación
-      setCurrentStep('confirm')
-
-      // Si es QR, iniciar polling
-      if (paymentType === 'qr' && qrPago) {
-        startPolling(qrPago.id)
+      // Solo el flujo de comprobante avanza manualmente; el QR se verifica solo
+      if (paymentType === 'proof') {
+        setCurrentStep('confirm')
       }
     } else if (currentStep === 'confirm') {
       // Confirmar y enviar
@@ -195,23 +258,6 @@ export default function PagarPage() {
       setSubmitting(true)
 
       if (paymentType === 'proof') {
-        // Para comprobante: primero crear el pago si no existe
-        if (!qrPago) {
-          try {
-            setCreatingPayment(true)
-            const paymentData = await apiService.createPayment({
-              property_id: 0,
-              plan_id: Number(planId),
-            })
-            setQrPago(paymentData)
-          } catch (error: any) {
-            toast.error(error.message || "Error al crear el pago")
-            return
-          } finally {
-            setCreatingPayment(false)
-          }
-        }
-
         // Subir comprobante
         if (!proofFile || !proofPreview || !qrPago) {
           toast.error('Debes subir una imagen del comprobante')
@@ -230,7 +276,7 @@ export default function PagarPage() {
           router.push('/')
         }, 2000)
       }
-      // Si es QR, el polling ya está verificando
+      // Si es QR, el polling ya verificó y redirigió solo
     } catch (error: any) {
       toast.error(error.message || 'Error al enviar comprobante')
     } finally {
@@ -469,22 +515,22 @@ export default function PagarPage() {
             {/* Timer */}
             <div className={cn(
               "p-4 rounded-xl border-2 transition-all duration-300",
-              timeLeft < 300
+              expirado || timeLeft < 300
                 ? "bg-red-100 dark:bg-red-950/30 border-red-500"
                 : "bg-primary/10 dark:bg-primary/20 border-primary"
             )}>
               <div className="flex items-center justify-center gap-3">
                 <Clock className={cn(
                   "w-6 h-6",
-                  timeLeft < 300 ? "text-red-600 dark:text-red-400 animate-pulse" : "text-primary"
+                  expirado || timeLeft < 300 ? "text-red-600 dark:text-red-400 animate-pulse" : "text-primary"
                 )} />
                 <div>
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Tiempo restante
+                    {expirado ? "QR expirado" : "El QR se inhabilita en"}
                   </p>
                   <p className={cn(
                     "text-3xl font-bold font-mono",
-                    timeLeft < 300 ? "text-red-600 dark:text-red-400" : "text-primary"
+                    expirado || timeLeft < 300 ? "text-red-600 dark:text-red-400" : "text-primary"
                   )}>
                     {formatTime(timeLeft)}
                   </p>
@@ -496,19 +542,43 @@ export default function PagarPage() {
             <div className="relative inline-block">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl opacity-20 blur-xl"></div>
               <div className="relative bg-white p-8 rounded-2xl shadow-2xl border-4 border-gray-100">
-                {qrPago?.imagen_qr ? (
+                {qrPago?.imagen_qr && !expirado ? (
                   <img
                     src={`data:image/png;base64,${qrPago.imagen_qr}`}
                     alt="QR de pago"
                     className="w-[350px] h-[350px] object-contain"
                   />
                 ) : (
-                  <div className="w-[350px] h-[350px] flex items-center justify-center">
-                    <Loader2 className="w-16 h-16 animate-spin text-primary" />
+                  <div className="w-[350px] h-[350px] flex flex-col items-center justify-center gap-3">
+                    {expirado ? (
+                      <>
+                        <Clock className="w-14 h-14 text-red-400" />
+                        <p className="text-sm text-gray-500">Este QR ya no es válido</p>
+                        <Button onClick={handleRegenerarQr} disabled={creatingPayment}>
+                          {creatingPayment ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                          Generar nuevo QR
+                        </Button>
+                      </>
+                    ) : (
+                      <Loader2 className="w-16 h-16 animate-spin text-primary" />
+                    )}
                   </div>
                 )}
               </div>
             </div>
+
+            {/* Estado de verificación en vivo */}
+            {!expirado && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-center gap-2 text-sm text-blue-900 dark:text-blue-300">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Esperando tu pago... Verificamos automáticamente cada 5 segundos</span>
+                </div>
+                <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                  Cuando el banco confirme, pasarás automáticamente a la siguiente pantalla
+                </p>
+              </div>
+            )}
 
             {/* Amount */}
             <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-4">
@@ -519,7 +589,7 @@ export default function PagarPage() {
             </div>
 
             {/* Instructions */}
-            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-left">
               <div className="flex items-center gap-2 mb-2">
                 <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 <p className="text-sm font-semibold text-blue-900 dark:text-blue-300">
@@ -534,6 +604,17 @@ export default function PagarPage() {
                 <li>El sistema verificará automáticamente</li>
               </ol>
             </div>
+
+            {/* Cancelar pago */}
+            <Button
+              variant="outline"
+              onClick={handleCancelarQr}
+              disabled={cancelandoQr}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+            >
+              {cancelandoQr ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
+              Cancelar pago e inhabilitar QR
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -685,6 +766,8 @@ export default function PagarPage() {
             onProceed={handleNext}
             onBack={handleBack}
             isSubmitting={submitting}
+            stepsConfig={paymentType === 'qr' ? qrSteps : undefined}
+            hideNavigation={paymentType === 'qr' && currentStep === 'proof'}
           >
             {currentStep === 'method' && renderMethodStep()}
             {currentStep === 'proof' && renderProofStep()}

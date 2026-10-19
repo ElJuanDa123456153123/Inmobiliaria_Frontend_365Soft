@@ -84,6 +84,8 @@ interface FormularioContextType {
   imagenesDatos: ImagenesDatos
   descripcionDatos: DescripcionDatos
   planSeleccionado?: string
+  isInitialized: boolean
+  editPropertyId: number | null
   setPasoActual: (paso: number) => void
   setDatosOperacion: (datos: Partial<DatosOperacion>) => void
   setDatosGenerales: (datos: Partial<DatosGenerales>) => void
@@ -92,6 +94,7 @@ interface FormularioContextType {
   setImagenesDatos: (datos: Partial<ImagenesDatos>) => void
   setDescripcionDatos: (datos: Partial<DescripcionDatos>) => void
   setPlanSeleccionado: (plan: string) => void
+  setEditPropertyId: (id: number | null) => void
   addImagen: (imagen: Imagen) => void
   removeImagen: (id: string) => void
   updateImagenOrden: (imagenes: Imagen[]) => void
@@ -170,6 +173,7 @@ export function FormularioProvider({ children }: { children: ReactNode }) {
   const [imagenesDatos, setImagenesDatosState] = useState(initialState.imagenesDatos)
   const [descripcionDatos, setDescripcionDatosState] = useState(initialState.descripcionDatos)
   const [planSeleccionado, setPlanSeleccionado] = useState<string | undefined>()
+  const [editPropertyId, setEditPropertyId] = useState<number | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
 
   // Hydrate from localStorage on mount (client-side only)
@@ -188,6 +192,7 @@ export function FormularioProvider({ children }: { children: ReactNode }) {
             setImagenesDatosState(parsed.state.imagenesDatos || initialState.imagenesDatos)
             setDescripcionDatosState(parsed.state.descripcionDatos || initialState.descripcionDatos)
             setPlanSeleccionado(parsed.state.planSeleccionado)
+            setEditPropertyId(parsed.state.editPropertyId ?? null)
           }
         }
       } catch (error) {
@@ -210,13 +215,14 @@ export function FormularioProvider({ children }: { children: ReactNode }) {
           imagenesDatos,
           descripcionDatos,
           planSeleccionado,
+          editPropertyId,
         }
         localStorage.setItem('formulario-publicacion-storage', JSON.stringify({ state: stateToPersist }))
       } catch (error) {
         console.error('Error persisting form state:', error)
       }
     }
-  }, [pasoActual, datosOperacion, datosGenerales, detallesPropiedad, confortSeguridad, imagenesDatos, descripcionDatos, planSeleccionado, isInitialized])
+  }, [pasoActual, datosOperacion, datosGenerales, detallesPropiedad, confortSeguridad, imagenesDatos, descripcionDatos, planSeleccionado, editPropertyId, isInitialized])
 
   const setDatosOperacion = (datos: Partial<DatosOperacion>) => {
     setDatosOperacionState(prev => ({ ...prev, ...datos }))
@@ -286,6 +292,7 @@ export function FormularioProvider({ children }: { children: ReactNode }) {
     setImagenesDatosState(initialState.imagenesDatos)
     setDescripcionDatosState(initialState.descripcionDatos)
     setPlanSeleccionado(undefined)
+    setEditPropertyId(null)
     if (typeof window !== 'undefined') {
       localStorage.removeItem('formulario-publicacion-storage')
     }
@@ -302,6 +309,8 @@ export function FormularioProvider({ children }: { children: ReactNode }) {
         imagenesDatos,
         descripcionDatos,
         planSeleccionado,
+        isInitialized,
+        editPropertyId,
         setPasoActual,
         setDatosOperacion,
         setDatosGenerales,
@@ -310,6 +319,7 @@ export function FormularioProvider({ children }: { children: ReactNode }) {
         setImagenesDatos,
         setDescripcionDatos,
         setPlanSeleccionado,
+        setEditPropertyId,
         addImagen,
         removeImagen,
         updateImagenOrden,

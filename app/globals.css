@@ -104,3 +104,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Leaflet usa z-index 400-1000 en sus paneles internos, lo que tapaba los
+   modales (z-50). Aislar el contenedor en su propio contexto de apilamiento
+   hace que todo el mapa quede por debajo de overlays y modales. */
+.leaflet-container {
+  z-index: 0;
+}

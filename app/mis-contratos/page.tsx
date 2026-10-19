@@ -1,9 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { FileText, DollarSign, Calendar, AlertCircle, TrendingUp } from "lucide-react"
 import Link from "next/link"
+import {
+  FileText, DollarSign, Calendar, AlertCircle, Wallet, ArrowRight,
+  CalendarClock, CircleCheck, Building, Loader2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { apiService, RentPayment } from "@/lib/services/api"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+
+const MESES_COMPLETOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
 interface Contract {
   id: number
@@ -23,34 +32,42 @@ interface Contract {
 
 export default function MisContratosDashboardPage() {
   const [contracts, setContracts] = useState<Contract[]>([])
+  const [pagos, setPagos] = useState<RentPayment[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchContracts()
+    const cargar = async () => {
+      try {
+        const token = localStorage.getItem("token")
+        const [resContratos, resPagos] = await Promise.all([
+          fetch(`${API_URL}/api/contracts/my?estado=activo`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          apiService.getPaymentHistory("", "inquilino"),
+        ])
+        if (resContratos.ok) {
+          const data = await resContratos.json()
+          setContracts(data.contratos || [])
+        }
+        setPagos(resPagos.pagos || [])
+      } catch (error) {
+        console.error("Error cargando dashboard:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    cargar()
   }, [])
 
-  const fetchContracts = async () => {
-    try {
-      const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:3001/api/contracts/my?estado=activo", {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      })
+  const cuotas = pagos.filter((p) => p.estado !== "pagado" && p.tipo !== "devolucion_deposito" && p.tipo !== "devolucion_anticres")
+  const atrasadas = cuotas.filter((p) => p.estado === "atrasado")
+  const pagadas = pagos.filter((p) => p.estado === "pagado")
 
-      if (response.ok) {
-        const data = await response.json()
-        setContracts(data.contratos || [])
-      }
-    } catch (error) {
-      console.error("Error fetching contracts:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Próximo pago: la cuota más cercana a vencer (atrasadas primero por monto alto)
+  const proximoPago = [...cuotas]
+    .sort((a, b) => (a.estado === "atrasado" ? -1 : 1) - (b.estado === "atrasado" ? -1 : 1) || new Date(a.fecha_pago).getTime() - new Date(b.fecha_pago).getTime())[0]
 
-  const activeContracts = contracts.filter(c => c.estado === "activo")
-  const totalMonthlyIncome = activeContracts.reduce((sum, c) => sum + c.monto_mensual, 0)
+  const cuotaMensual = contracts[0]?.monto_mensual || 0
 
   if (loading) {
     return (
@@ -61,103 +78,150 @@ export default function MisContratosDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard de Contratos</h1>
-        <p className="text-gray-600 mt-1">Gestiona tus contratos de alquiler</p>
+        <h1 className="text-3xl font-bold text-gray-900">Resumen</h1>
+        <p className="text-gray-600 mt-1 text-sm">Tus alquileres y pagos de un vistazo</p>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-sm p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-green-100 text-sm">Contratos Activos</p>
-              <p className="text-3xl font-bold mt-1">{activeContracts.length}</p>
-            </div>
-            <FileText className="w-8 h-8 text-green-200" />
-          </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <p className="text-xs text-gray-500 flex items-center gap-1.5">
+            <CalendarClock className="w-3.5 h-3.5" />
+            Cuota mensual
+          </p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">Bs. {cuotaMensual.toLocaleString()}</p>
         </div>
-
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-sm p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm">Ingreso Mensual</p>
-              <p className="text-3xl font-bold mt-1">Bs. {totalMonthlyIncome.toLocaleString()}</p>
-            </div>
-            <DollarSign className="w-8 h-8 text-blue-200" />
-          </div>
+        <div className={`rounded-xl border shadow-sm p-4 ${atrasadas.length > 0 ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+          <p className={`text-xs flex items-center gap-1.5 ${atrasadas.length > 0 ? "text-red-600" : "text-gray-500"}`}>
+            <AlertCircle className="w-3.5 h-3.5" />
+            En atraso
+          </p>
+          <p className={`text-2xl font-bold mt-1 ${atrasadas.length > 0 ? "text-red-600" : "text-gray-300"}`}>
+            {atrasadas.length}
+          </p>
         </div>
-
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-sm p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-100 text-sm">Total Contratos</p>
-              <p className="text-3xl font-bold mt-1">{contracts.length}</p>
-            </div>
-            <TrendingUp className="w-8 h-8 text-purple-200" />
-          </div>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <p className="text-xs text-gray-500 flex items-center gap-1.5">
+            <Wallet className="w-3.5 h-3.5" />
+            Por pagar
+          </p>
+          <p className="text-2xl font-bold text-amber-500 mt-1">
+            Bs. {cuotas.reduce((a, p) => a + p.monto, 0).toLocaleString()}
+          </p>
         </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Acciones Rápidas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/mis-contratos/activos">
-            <Button variant="outline" className="w-full justify-start">
-              <FileText className="w-4 h-4 mr-2" />
-              Ver Contratos Activos
-            </Button>
-          </Link>
-          <Link href="/mis-contratos/pagos">
-            <Button variant="outline" className="w-full justify-start">
-              <DollarSign className="w-4 h-4 mr-2" />
-              Registrar Pago
-            </Button>
-          </Link>
-          <Link href="/mis-contratos/historico">
-            <Button variant="outline" className="w-full justify-start">
-              <Calendar className="w-4 h-4 mr-2" />
-              Ver Histórico
-            </Button>
-          </Link>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <p className="text-xs text-gray-500 flex items-center gap-1.5">
+            <CircleCheck className="w-3.5 h-3.5" />
+            Pagadas
+          </p>
+          <p className="text-2xl font-bold text-green-600 mt-1">{pagadas.length}</p>
         </div>
       </div>
 
-      {/* Active Contracts */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Contratos Activos Recientes</h2>
-          <Link href="/mis-contratos/activos">
-            <Button variant="outline" size="sm">Ver todos</Button>
+      {/* Próximo pago destacado */}
+      {proximoPago && (
+        <div className={`rounded-xl border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+          proximoPago.estado === "atrasado" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"
+        }`}>
+          <div className="flex items-center gap-4">
+            <div className={`w-14 shrink-0 text-center rounded-lg border py-2 bg-white ${
+              proximoPago.estado === "atrasado" ? "border-red-200" : "border-amber-200"
+            }`}>
+              <p className={`text-[10px] uppercase font-semibold ${proximoPago.estado === "atrasado" ? "text-red-600" : "text-amber-600"}`}>
+                {MESES_COMPLETOS[proximoPago.mes_correspondiente - 1]?.slice(0, 3) || "?"}
+              </p>
+              <p className={`text-xl font-bold leading-tight ${proximoPago.estado === "atrasado" ? "text-red-700" : "text-amber-700"}`}>
+                {new Date(proximoPago.fecha_pago).getDate()}
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-gray-900">
+                  {proximoPago.estado === "atrasado" ? "Tienes un pago atrasado" : "Próximo pago"}
+                </p>
+                <Badge className={proximoPago.estado === "atrasado" ? "bg-red-500" : "bg-amber-500"}>
+                  {proximoPago.estado === "atrasado" ? "Atrasado" : "Pendiente"}
+                </Badge>
+              </div>
+              <p className="text-sm text-gray-600 mt-0.5">
+                {proximoPago.contract?.property?.titulo || "Tu alquiler"} · Vencía el{" "}
+                {new Date(proximoPago.fecha_pago).toLocaleDateString("es-BO", { day: "numeric", month: "long" })}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <p className="text-2xl font-bold text-gray-900">Bs. {proximoPago.monto.toLocaleString()}</p>
+            <Link href="/mis-contratos/pagos">
+              <Button className="bg-green-600 hover:bg-green-700">
+                Pagar ahora
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Accesos rápidos */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          { href: "/mis-contratos/pagos", icon: DollarSign, titulo: "Mis pagos", desc: "Pagar con QR o subir comprobante" },
+          { href: "/mis-contratos/activos", icon: FileText, titulo: "Contratos activos", desc: "Detalles y PDF de tu contrato" },
+          { href: "/mis-contratos/historico", icon: Calendar, titulo: "Histórico", desc: "Contratos finalizados" },
+        ].map((a) => {
+          const Icono = a.icon
+          return (
+            <Link
+              key={a.href}
+              href={a.href}
+              className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:border-green-300 hover:shadow transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                  <Icono className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 text-sm">{a.titulo}</p>
+                  <p className="text-xs text-gray-500 truncate">{a.desc}</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-green-600 ml-auto transition-colors" />
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+
+      {/* Contratos activos */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
+            <Building className="w-3.5 h-3.5" />
+            Mis alquileres activos
+          </h2>
+          <Link href="/mis-contratos/activos" className="text-xs text-green-600 hover:underline">
+            Ver todos
           </Link>
         </div>
-
-        {activeContracts.length === 0 ? (
-          <div className="text-center py-8">
-            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600">No tienes contratos activos</p>
+        {contracts.length === 0 ? (
+          <div className="p-8 text-center">
+            <Building className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">No tienes contratos de alquiler activos</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {activeContracts.slice(0, 5).map((contract) => (
-              <div
-                key={contract.id}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">{contract.property.titulo}</h3>
-                  <p className="text-sm text-gray-600">Inquilino: {contract.inquilino.nombre}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-green-600">
-                    Bs. {contract.monto_mensual.toLocaleString()}/mes
-                  </p>
+          <div className="divide-y divide-gray-50">
+            {contracts.slice(0, 4).map((contract) => (
+              <div key={contract.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-gray-50">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 text-sm truncate">{contract.property.titulo}</p>
                   <p className="text-xs text-gray-500">
-                    Vence: {new Date(contract.fecha_fin).toLocaleDateString("es-ES")}
+                    Hasta {new Date(contract.fecha_fin).toLocaleDateString("es-BO", { day: "numeric", month: "long", year: "numeric" })}
                   </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-semibold text-green-600 text-sm">Bs. {contract.monto_mensual.toLocaleString()}<span className="text-xs text-gray-400 font-normal">/mes</span></p>
+                  <Badge className="bg-green-500 text-[10px]">Activo</Badge>
                 </div>
               </div>
             ))}
@@ -165,18 +229,13 @@ export default function MisContratosDashboardPage() {
         )}
       </div>
 
-      {/* Info Banner */}
-      {activeContracts.length === 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-          <div className="flex items-start">
-            <AlertCircle className="w-6 h-6 text-yellow-600 mr-3 mt-1" />
-            <div>
-              <h3 className="font-semibold text-yellow-900 mb-2">No tienes contratos activos</h3>
-              <p className="text-sm text-yellow-800">
-                Los contratos de alquiler te permiten gestionar los pagos mensuales y el seguimiento de tus propiedades en alquiler.
-              </p>
-            </div>
-          </div>
+      {/* Info: sin contratos */}
+      {contracts.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-yellow-800">
+            Cuando aceptes un alquiler desde una propiedad, tu contrato y sus cuotas aparecerán aquí automáticamente.
+          </p>
         </div>
       )}
     </div>

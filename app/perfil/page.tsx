@@ -28,11 +28,13 @@ import {
   CheckCircle2,
   LayoutDashboard,
   BarChart3,
+  KeyRound,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { QrPagoCard } from "@/components/profile/qr-pago-card"
 import { Input } from "@/components/ui/input"
 import { apiService, UserProfile, Property, SavedSearch, ViewHistoryItem, Subscription, QrPago } from "@/lib/services/api"
 import { toast } from "sonner"
@@ -543,6 +545,14 @@ function PerfilContent() {
 
                   <div className="border-t mt-4 pt-4 space-y-1">
                     <button
+                      onClick={() => router.push('/mis-contratos')}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-gray-100 text-gray-700 transition-colors"
+                    >
+                      <KeyRound className="w-5 h-5 text-blue-600" />
+                      <span className="font-medium">Mis contratos</span>
+                      <ChevronRight className="w-4 h-4 ml-auto text-gray-400" />
+                    </button>
+                    <button
                       onClick={() => router.push('/publicar')}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-gray-100 text-gray-700 transition-colors"
                     >
@@ -552,6 +562,11 @@ function PerfilContent() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* QR de cobros */}
+              <div className="mt-4">
+                <QrPagoCard />
+              </div>
 
               {/* Soporte */}
               <Card className="mt-4">

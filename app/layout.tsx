@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import Script from "next/script";
+import { AccentInit } from "@/components/accent-init";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,6 +50,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
+        <AccentInit />
         {children}
         <Toaster position="top-right" richColors />
       </body>

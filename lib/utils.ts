@@ -53,3 +53,17 @@ export function getImageUrl(imageUrl: string | null | undefined): string | null 
   // 6. Para cualquier otro caso, devolver tal cual (puede ser una URL relativa sin /)
   return imageUrl
 }
+
+/**
+ * Interpreta la fecha de una visita como "hora de pared" (wall time).
+ *
+ * El backend guarda y devuelve la hora exacta que se eligió en la agenda
+ * (ej: 10:00), pero serializada en UTC (ej: "2026-10-19T10:00:00Z").
+ * new Date() convertiría a la zona del navegador y mostraría otra hora.
+ * Aquí quitamos el sufijo de zona para que se muestre la hora tal cual
+ * se agendó, sin conversiones.
+ */
+export function parseFechaVisita(iso: string): Date {
+  const sinZona = iso.replace(/(Z|[+-]\d{2}:?\d{2})$/i, "")
+  return new Date(sinZona)
+}

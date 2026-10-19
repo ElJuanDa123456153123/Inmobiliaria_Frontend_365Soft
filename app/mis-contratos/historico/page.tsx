@@ -1,9 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { History, Building, User, Calendar, CheckCircle, XCircle } from "lucide-react"
+import { History, Building, Calendar, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
 interface Contract {
   id: number
@@ -22,6 +24,12 @@ interface Contract {
   }
 }
 
+const badgeEstado: Record<string, { label: string; className: string }> = {
+  activo: { label: "Activo", className: "bg-green-500" },
+  vencido: { label: "Vencido", className: "bg-red-500" },
+  terminado: { label: "Terminado", className: "bg-gray-400" },
+}
+
 export default function MisContratosHistoricoPage() {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,30 +37,19 @@ export default function MisContratosHistoricoPage() {
 
   useEffect(() => {
     fetchContracts()
-  }, [filterEstado])
+  }, [])
 
   const fetchContracts = async () => {
     try {
+      setLoading(true)
       const token = localStorage.getItem("token")
-      let url = "http://localhost:3001/api/contracts/my"
-
-      if (filterEstado) {
-        url += `?estado=${filterEstado}`
-      }
-
-      const response = await fetch(url, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+      const response = await fetch(`${API_URL}/api/contracts/my`, {
+        headers: { Authorization: `Bearer ${token}` },
       })
-
       if (response.ok) {
         const data = await response.json()
-        // Excluir contratos activos, mostrar solo vencidos y terminados
-        const historicalContracts = (data.contratos || []).filter(
-          (c: Contract) => c.estado !== "activo"
-        )
-        setContracts(historicalContracts)
+        // Solo histórico: vencidos y terminados
+        setContracts((data.contratos || []).filter((c: Contract) => c.estado !== "activo"))
       }
     } catch (error) {
       console.error("Error fetching contracts:", error)
@@ -61,28 +58,14 @@ export default function MisContratosHistoricoPage() {
     }
   }
 
-  const getEstadoBadge = (estado: string) => {
-    switch (estado) {
-      case "activo":
-        return <Badge className="bg-green-500">Activo</Badge>
-      case "vencido":
-        return <Badge className="bg-red-500">Vencido</Badge>
-      case "terminado":
-        return <Badge className="bg-gray-500">Terminado</Badge>
-      default:
-        return <Badge>{estado}</Badge>
-    }
-  }
+  const filtered = contracts
+    .filter((c) => !filterEstado || c.estado === filterEstado)
+    .sort((a, b) => new Date(b.fecha_fin).getTime() - new Date(a.fecha_fin).getTime())
 
-  const getEstadoIcon = (estado: string) => {
-    switch (estado) {
-      case "vencido":
-        return <XCircle className="w-5 h-5 text-red-500" />
-      case "terminado":
-        return <CheckCircle className="w-5 h-5 text-gray-500" />
-      default:
-        return <Calendar className="w-5 h-5 text-gray-500" />
-    }
+  const conteos = {
+    todos: contracts.length,
+    vencido: contracts.filter((c) => c.estado === "vencido").length,
+    terminado: contracts.filter((c) => c.estado === "terminado").length,
   }
 
   if (loading) {
@@ -94,95 +77,83 @@ export default function MisContratosHistoricoPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-5">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Histórico de Contratos</h1>
-        <p className="text-gray-600 mt-1">Contratos vencidos y terminados</p>
+        <h1 className="text-3xl font-bold text-gray-900">Histórico</h1>
+        <p className="text-gray-600 mt-1 text-sm">Contratos vencidos y terminados</p>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="flex gap-2">
-          <Button
-            variant={filterEstado === "" ? "default" : "outline"}
-            onClick={() => setFilterEstado("")}
-            size="sm"
+      {/* Chips-filtro con conteos */}
+      <div className="flex flex-wrap gap-2">
+        {([
+          ["", "Todos", conteos.todos],
+          ["vencido", "Vencidos", conteos.vencido],
+          ["terminado", "Terminados", conteos.terminado],
+        ] as [string, string, number][]).map(([valor, label, count]) => (
+          <button
+            key={valor || "todos"}
+            onClick={() => setFilterEstado(valor)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              filterEstado === valor
+                ? "bg-green-600 text-white border-green-600 shadow-sm"
+                : "bg-white text-gray-600 border-gray-200 hover:border-green-300"
+            }`}
           >
-            Todos
-          </Button>
-          <Button
-            variant={filterEstado === "vencido" ? "default" : "outline"}
-            onClick={() => setFilterEstado("vencido")}
-            size="sm"
-          >
-            Vencidos
-          </Button>
-          <Button
-            variant={filterEstado === "terminado" ? "default" : "outline"}
-            onClick={() => setFilterEstado("terminado")}
-            size="sm"
-          >
-            Terminados
-          </Button>
-        </div>
+            {label}
+            <span className={`ml-1.5 px-1.5 rounded-full text-[10px] font-semibold ${
+              filterEstado === valor ? "bg-white/20" : "bg-gray-100"
+            }`}>
+              {count}
+            </span>
+          </button>
+        ))}
       </div>
 
-      {/* Contracts List */}
-      {contracts.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <History className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay histórico</h3>
-          <p className="text-gray-600">
-            {filterEstado
-              ? "No hay contratos con el estado seleccionado"
-              : "Aún no tienes contratos vencidos o terminados"}
-          </p>
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+          <History className="w-14 h-14 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">No hay histórico</h3>
+          <p className="text-gray-500 text-sm">Aún no tienes contratos vencidos o terminados</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {contracts.map((contract) => (
-            <div
-              key={contract.id}
-              className="bg-white rounded-xl shadow-sm p-6"
-            >
-              <div className="flex items-start justify-between">
-                {/* Contract Info */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <h3 className="font-semibold text-gray-900 text-lg">{contract.property.titulo}</h3>
-                    {getEstadoBadge(contract.estado)}
+        <div className="space-y-2">
+          {filtered.map((contract) => {
+            const badge = badgeEstado[contract.estado]
+            const Icono = contract.estado === "vencido" ? XCircle : CheckCircle
+            return (
+              <div
+                key={contract.id}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4 hover:shadow-md transition-shadow"
+              >
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                  contract.estado === "vencido" ? "bg-red-50" : "bg-gray-100"
+                }`}>
+                  <Icono className={`w-5 h-5 ${contract.estado === "vencido" ? "text-red-500" : "text-gray-400"}`} />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-medium text-gray-900 text-sm truncate">{contract.property.titulo}</h3>
+                    {badge && <Badge className={`${badge.className} text-[10px] px-2`}>{badge.label}</Badge>}
                   </div>
-
-                  <p className="text-sm text-gray-600 mb-4">{contract.property.zona}</p>
-
-                  {/* Tenant */}
-                  <div className="flex items-center text-sm text-gray-700 mb-3">
-                    <User className="w-4 h-4 mr-2" />
-                    <span>Inquilino: {contract.inquilino.nombre}</span>
-                  </div>
-
-                  {/* Dates */}
-                  <div className="flex items-center gap-6 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      <span>
-                        {new Date(contract.fecha_inicio).toLocaleDateString("es-ES")} - {new Date(contract.fecha_fin).toLocaleDateString("es-ES")}
-                      </span>
-                    </div>
-                    <div className="flex items-center font-medium">
-                      Bs. {contract.monto_mensual.toLocaleString()}/mes
-                    </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5 flex-wrap">
+                    <span className="flex items-center gap-1 truncate">
+                      <Building className="w-3.5 h-3.5" />
+                      {contract.property.zona}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {new Date(contract.fecha_inicio).toLocaleDateString("es-BO")} → {new Date(contract.fecha_fin).toLocaleDateString("es-BO")}
+                    </span>
                   </div>
                 </div>
 
-                {/* Status Icon */}
-                <div className="ml-4">
-                  {getEstadoIcon(contract.estado)}
+                <div className="text-right shrink-0">
+                  <p className="font-semibold text-gray-700 text-sm">Bs. {contract.monto_mensual.toLocaleString()}<span className="text-xs text-gray-400 font-normal">/mes</span></p>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

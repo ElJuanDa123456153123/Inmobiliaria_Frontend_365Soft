@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
-import Link from "next/link"
 
+import Link from "next/link"
+import { parseFechaVisita } from "@/lib/utils"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
 interface Visit {
@@ -197,11 +198,12 @@ export function VisitasTab() {
                       <span>{visit.property.zona}</span>
                     </div>
 
-                    {visit.estado !== "pendiente" && visit.fecha_visita && !visit.fecha_visita.startsWith("0001") ? (
+                    {visit.fecha_visita && !visit.fecha_visita.startsWith("0001") ? (
                       <div className="flex items-center text-sm text-gray-700">
                         <Calendar className="w-4 h-4 mr-2" />
                         <span className="font-medium">
-                          {new Date(visit.fecha_visita).toLocaleDateString("es-ES", {
+                          {parseFechaVisita(visit.fecha_visita).toLocaleDateString("es-BO", {
+                            weekday: "long",
                             year: "numeric",
                             month: "long",
                             day: "numeric",

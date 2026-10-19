@@ -16,6 +16,7 @@ interface ResumenPublicacionProps {
   onEditarPaso: (paso: number) => void
   onPublicar: () => void
   publishing?: boolean
+  modoEdicion?: boolean
 }
 
 export default function ResumenPublicacion({
@@ -27,7 +28,8 @@ export default function ResumenPublicacion({
   descripcionDatos,
   onEditarPaso,
   onPublicar,
-  publishing = false
+  publishing = false,
+  modoEdicion = false
 }: ResumenPublicacionProps) {
 
   const getTipoOperacionLabel = (tipo: string) => {
@@ -422,7 +424,7 @@ export default function ResumenPublicacion({
         </CardContent>
       </Card>
 
-      {/* Botón de publicación */}
+      {/* Botón de publicación / guardado */}
       <div className="flex justify-center pt-6">
         <Button
           onClick={onPublicar}
@@ -430,12 +432,16 @@ export default function ResumenPublicacion({
           size="lg"
           className="bg-primary hover:bg-primary/90 px-12 py-6 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {publishing ? 'Publicando...' : 'Publicar Propiedad'}
+          {publishing
+            ? (modoEdicion ? 'Guardando...' : 'Publicando...')
+            : (modoEdicion ? 'Guardar cambios' : 'Publicar Propiedad')}
         </Button>
       </div>
 
       <div className="text-center text-sm text-gray-600">
-        Al hacer clic en "Publicar Propiedad", aceptas nuestros términos y condiciones
+        {modoEdicion
+          ? 'Al guardar, los cambios se verán reflejados de inmediato en tu publicación'
+          : 'Al hacer clic en "Publicar Propiedad", aceptas nuestros términos y condiciones'}
       </div>
     </div>
   )
