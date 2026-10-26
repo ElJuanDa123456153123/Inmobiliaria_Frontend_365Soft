@@ -258,14 +258,32 @@ export default function PagarPage() {
       setSubmitting(true)
 
       if (paymentType === 'proof') {
-        // Subir comprobante
-        if (!proofFile || !proofPreview || !qrPago) {
+        // Crear el pago si aún no existe (vincula el comprobante a un QR)
+        let pago = qrPago
+        if (!pago) {
+          try {
+            setCreatingPayment(true)
+            pago = await apiService.createPayment({
+              property_id: 0,
+              plan_id: Number(planId),
+            })
+            setQrPago(pago)
+          } catch (error: any) {
+            toast.error(error.message || "Error al crear el pago")
+            return
+          } finally {
+            setCreatingPayment(false)
+          }
+        }
+
+        // Validar el comprobante
+        if (!proofFile || !proofPreview) {
           toast.error('Debes subir una imagen del comprobante')
           return
         }
 
         const result = await apiService.uploadProof({
-          qr_pago_id: qrPago.id,
+          qr_pago_id: pago.id,
           image: proofPreview, // Base64
         })
 

@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { AlertTriangle, Pencil, DollarSign, KeyRound, Handshake } from "lucide-react"
+import { AlertTriangle, Pencil, DollarSign, KeyRound, Handshake, Check } from "lucide-react"
 
 // Dynamically import components with SSR disabled
 const MapaSelector = dynamicImport(() => import("@/components/mapa/MapaSelector"), { ssr: false })
@@ -147,6 +147,13 @@ export function FormularioContent() {
         deposito: propiedad.deposito || '',
         plazoMinimo: propiedad.plazo_minimo || '',
         serviciosIncluidos: propiedad.servicios_incluidos || [],
+        alquilaPorHabitaciones: Boolean(propiedad.alquila_por_habitaciones),
+        habitaciones: (propiedad.habitaciones || []).map((h) => ({
+          nombre: h.nombre,
+          descripcion: h.descripcion || '',
+          precio: h.precio != null ? String(h.precio) : '',
+          activa: h.activa,
+        })),
         duracionContrato: propiedad.duracion_contrato || '',
         opcionCompra: Boolean(propiedad.opcion_compra),
       })
@@ -341,11 +348,19 @@ export function FormularioContent() {
         }))
 
       // Preparar payload con todos los datos del formulario
+      // En modo "por habitaciones", el precio general = mínimo de las habitaciones
+      const preciosHabitaciones = (datosOperacion.habitaciones || [])
+        .map((h) => parseFloat(h.precio || ''))
+        .filter((p) => !isNaN(p) && p > 0)
+      const esPorHabitaciones = datosOperacion.tipoOperacion === 'alquiler' && datosOperacion.alquilaPorHabitaciones
+
       const payload: any = {
         // === PASO 1: Datos de la operación ===
         titulo: datosOperacion.titulo.trim(),
         tipo_operacion: datosOperacion.tipoOperacion,
-        precio: parseFloat(datosOperacion.precio) || 0,
+        precio: esPorHabitaciones && preciosHabitaciones.length > 0
+          ? Math.min(...preciosHabitaciones)
+          : (parseFloat(datosOperacion.precio) || 0),
         moneda: datosOperacion.moneda,
         acepta_permuta: datosOperacion.aceptaPermuta,
         financia: datosOperacion.financia,
@@ -355,6 +370,15 @@ export function FormularioContent() {
           deposito: datosOperacion.deposito,
           plazo_minimo: datosOperacion.plazoMinimo,
           servicios_incluidos: datosOperacion.serviciosIncluidos,
+          alquila_por_habitaciones: Boolean(datosOperacion.alquilaPorHabitaciones),
+          habitaciones: (datosOperacion.habitaciones || [])
+            .filter((h) => (h.nombre || '').trim())
+            .map((h) => ({
+              nombre: h.nombre.trim(),
+              descripcion: h.descripcion?.trim(),
+              precio: h.precio && parseFloat(h.precio) > 0 ? parseFloat(h.precio) : null,
+              activa: h.activa !== false,
+            })),
         }),
         ...(datosOperacion.tipoOperacion === 'anticretico' && {
           duracion_contrato: datosOperacion.duracionContrato,
@@ -647,39 +671,193 @@ export function FormularioContent() {
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          {datosOperacion.tipoOperacion === 'venta' && 'Precio de venta'}
-                          {datosOperacion.tipoOperacion === 'alquiler' && 'Alquiler mensual'}
-                          {datosOperacion.tipoOperacion === 'anticretico' && 'Monto de anticrético'}
-                          {!datosOperacion.tipoOperacion && 'Precio'}
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <div className="flex gap-2">
-                          <Select value={datosOperacion.moneda} onValueChange={(value) => setDatosOperacion({ moneda: value as any })}>
-                            <SelectTrigger className="w-24 bg-gray-50 border-gray-300">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="USD">U$S</SelectItem>
-                              <SelectItem value="BOB">Bs</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            type="number"
-                            value={datosOperacion.precio}
-                            onChange={(e) => setDatosOperacion({ precio: e.target.value })}
-                            placeholder={datosOperacion.tipoOperacion === 'alquiler' ? 'Ej: 500' : datosOperacion.tipoOperacion === 'anticretico' ? 'Ej: 50000' : 'Ej: 120000'}
-                            className="flex-1 bg-gray-50 border-gray-300"
-                          />
+                      {/* ¿Cómo se alquila? — solo alquiler, va ANTES del precio */}
+                      {datosOperacion.tipoOperacion === 'alquiler' && (
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            ¿Cómo se alquila? <span className="text-red-500">*</span>
+                          </label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button
+                              type="button"
+                              onClick={() => setDatosOperacion({ alquilaPorHabitaciones: false })}
+                              className={`
+                                relative p-4 rounded-xl border-2 text-left transition-all group hover:shadow-md
+                                ${!datosOperacion.alquilaPorHabitaciones
+                                  ? 'border-primary bg-gradient-to-br from-primary/10 to-primary/5'
+                                  : 'border-gray-200 bg-white hover:border-primary/50'
+                                }
+                              `}
+                            >
+                              {!datosOperacion.alquilaPorHabitaciones && (
+                                <div className="absolute top-3 right-3 bg-primary rounded-full p-1">
+                                  <Check className="w-3 h-3 text-white" />
+                                </div>
+                              )}
+                              <p className="font-semibold text-gray-900">🏠 Propiedad completa</p>
+                              <p className="text-xs text-gray-500 mt-1">Un solo inquilino alquila todo. Una renta mensual para toda la propiedad.</p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!datosOperacion.habitaciones || datosOperacion.habitaciones.length === 0) {
+                                  setDatosOperacion({
+                                    alquilaPorHabitaciones: true,
+                                    habitaciones: [{ nombre: 'Habitación 1', descripcion: '', precio: '', activa: true }],
+                                  })
+                                } else {
+                                  setDatosOperacion({ alquilaPorHabitaciones: true })
+                                }
+                              }}
+                              className={`
+                                relative p-4 rounded-xl border-2 text-left transition-all group hover:shadow-md
+                                ${datosOperacion.alquilaPorHabitaciones
+                                  ? 'border-primary bg-gradient-to-br from-primary/10 to-primary/5'
+                                  : 'border-gray-200 bg-white hover:border-primary/50'
+                                }
+                              `}
+                            >
+                              {datosOperacion.alquilaPorHabitaciones && (
+                                <div className="absolute top-3 right-3 bg-primary rounded-full p-1">
+                                  <Check className="w-3 h-3 text-white" />
+                                </div>
+                              )}
+                              <p className="font-semibold text-gray-900">🛏️ Por habitaciones</p>
+                              <p className="text-xs text-gray-500 mt-1">Varios inquilinos, cada uno alquila su habitación (ej: condominios). Precio por habitación.</p>
+                            </button>
+                          </div>
                         </div>
-                        {datosOperacion.tipoOperacion === 'alquiler' && (
-                          <p className="text-xs text-gray-500 mt-1">Precio mensual en {datosOperacion.moneda === 'USD' ? 'dólares' : 'bolivianos'}</p>
-                        )}
-                        {datosOperacion.tipoOperacion === 'anticretico' && (
-                          <p className="text-xs text-gray-500 mt-1">Monto del anticrético en {datosOperacion.moneda === 'USD' ? 'dólares' : 'bolivianos'}</p>
-                        )}
-                      </div>
+                      )}
+
+                      {/* Precio: en modo habitaciones es referencia (mínimo de las habitaciones) */}
+                      {!(datosOperacion.tipoOperacion === 'alquiler' && datosOperacion.alquilaPorHabitaciones) ? (
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            {datosOperacion.tipoOperacion === 'venta' && 'Precio de venta'}
+                            {datosOperacion.tipoOperacion === 'alquiler' && 'Alquiler mensual'}
+                            {datosOperacion.tipoOperacion === 'anticretico' && 'Monto de anticrético'}
+                            {!datosOperacion.tipoOperacion && 'Precio'}
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <div className="flex gap-2">
+                            <Select value={datosOperacion.moneda} onValueChange={(value) => setDatosOperacion({ moneda: value as any })}>
+                              <SelectTrigger className="w-24 bg-gray-50 border-gray-300">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">U$S</SelectItem>
+                                <SelectItem value="BOB">Bs</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              value={datosOperacion.precio}
+                              onChange={(e) => setDatosOperacion({ precio: e.target.value })}
+                              placeholder={datosOperacion.tipoOperacion === 'alquiler' ? 'Ej: 500' : datosOperacion.tipoOperacion === 'anticretico' ? 'Ej: 50000' : 'Ej: 120000'}
+                              className="flex-1 bg-gray-50 border-gray-300"
+                            />
+                          </div>
+                          {datosOperacion.tipoOperacion === 'alquiler' && (
+                            <p className="text-xs text-gray-500 mt-1">Precio mensual en {datosOperacion.moneda === 'USD' ? 'dólares' : 'bolivianos'}</p>
+                          )}
+                          {datosOperacion.tipoOperacion === 'anticretico' && (
+                            <p className="text-xs text-gray-500 mt-1">Monto del anticrético en {datosOperacion.moneda === 'USD' ? 'dólares' : 'bolivianos'}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-3 text-sm text-gray-600">
+                          💡 El precio de referencia del aviso será el <strong>mínimo entre tus habitaciones</strong>
+                          {(() => {
+                            const precios = (datosOperacion.habitaciones || []).map((h) => parseFloat(h.precio || '')).filter((p) => !isNaN(p) && p > 0)
+                            if (precios.length === 0) {
+                              return <span>. Define el precio de cada habitación en la lista de abajo 👇</span>
+                            }
+                            const moneda = datosOperacion.moneda === 'USD' ? 'US$' : 'Bs'
+                            return <span>: <strong>{moneda} {Math.min(...precios).toLocaleString()}/mes</strong></span>
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Habitaciones: solo en modo "por habitaciones" */}
+                      {datosOperacion.tipoOperacion === 'alquiler' && datosOperacion.alquilaPorHabitaciones && (
+                        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4">
+                          <p className="text-sm font-semibold text-gray-800 mb-3">
+                            🛏️ Habitaciones a alquilar
+                            <span className="ml-2 text-xs font-normal text-gray-500">(mínimo 1 — cada inquilino elige la suya)</span>
+                          </p>
+                          <div className="space-y-3">
+                            {(datosOperacion.habitaciones || []).map((hab, idx) => (
+                              <div key={idx} className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-gray-400 shrink-0">#{idx + 1}</span>
+                                  <Input
+                                    type="text"
+                                    value={hab.nombre}
+                                    onChange={(e) => {
+                                      const habs = [...(datosOperacion.habitaciones || [])]
+                                      habs[idx] = { ...habs[idx], nombre: e.target.value }
+                                      setDatosOperacion({ habitaciones: habs })
+                                    }}
+                                    placeholder={`Nombre (ej: Habitación ${idx + 1} — baño privado)`}
+                                    className="bg-gray-50 border-gray-300 flex-1"
+                                  />
+                                  {(datosOperacion.habitaciones || []).length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDatosOperacion({
+                                          habitaciones: (datosOperacion.habitaciones || []).filter((_, i) => i !== idx),
+                                        })
+                                      }}
+                                      className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded"
+                                      title="Quitar habitación"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="text"
+                                    value={hab.precio ?? ''}
+                                    onChange={(e) => {
+                                      const habs = [...(datosOperacion.habitaciones || [])]
+                                      habs[idx] = { ...habs[idx], precio: e.target.value }
+                                      setDatosOperacion({ habitaciones: habs })
+                                    }}
+                                    placeholder={`Precio mensual (${datosOperacion.moneda === 'USD' ? 'US$' : 'Bs'})`}
+                                    className="bg-gray-50 border-gray-300 w-1/2"
+                                  />
+                                  <Input
+                                    type="text"
+                                    value={hab.descripcion ?? ''}
+                                    onChange={(e) => {
+                                      const habs = [...(datosOperacion.habitaciones || [])]
+                                      habs[idx] = { ...habs[idx], descripcion: e.target.value }
+                                      setDatosOperacion({ habitaciones: habs })
+                                    }}
+                                    placeholder="Detalles (amoblado, closet...)"
+                                    className="bg-gray-50 border-gray-300 flex-1"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const habs = datosOperacion.habitaciones || []
+                                if (habs.length >= 30) return
+                                setDatosOperacion({
+                                  habitaciones: [...habs, { nombre: `Habitación ${habs.length + 1}`, descripcion: '', precio: '', activa: true }],
+                                })
+                              }}
+                              className="text-sm text-primary hover:underline font-medium"
+                            >
+                              + Agregar habitación
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Condiciones de venta: solo aplican para VENTA */}
                       {datosOperacion.tipoOperacion === 'venta' && (

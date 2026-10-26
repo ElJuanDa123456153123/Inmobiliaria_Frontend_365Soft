@@ -100,6 +100,7 @@ export default function PropertyDetailPage() {
   const [mensajeAlquiler, setMensajeAlquiler] = useState("")
   const [telefonoAlquiler, setTelefonoAlquiler] = useState("")
   const [enviandoAlquiler, setEnviandoAlquiler] = useState(false)
+  const [habitacionSeleccionada, setHabitacionSeleccionada] = useState("")
   const [yaSolicito, setYaSolicito] = useState(false)
 
   // Refs para usar dentro del WebSocket sin reconectar
@@ -519,6 +520,15 @@ export default function PropertyDetailPage() {
       router.push(`/ingresar?redirect=/propiedades/${params.id}`)
       return
     }
+    // Alquiler por habitaciones: necesita al menos una habitación libre
+    if (property?.alquila_por_habitaciones) {
+      const libres = (property.habitaciones || []).filter((h) => h.disponible)
+      if (libres.length === 0) {
+        toast.info("No hay habitaciones disponibles en este momento")
+        return
+      }
+    }
+    setHabitacionSeleccionada("")
     setModalAlquilerAbierto(true)
   }
 
@@ -532,17 +542,26 @@ export default function PropertyDetailPage() {
       return
     }
 
+    // Alquiler por habitaciones: la habitación es obligatoria
+    const habitacionesLibres = (property.habitaciones || []).filter((h) => h.disponible)
+    if (property.alquila_por_habitaciones && !habitacionSeleccionada) {
+      toast.error("Elige una habitación disponible")
+      return
+    }
+
     setEnviandoAlquiler(true)
 
     try {
       await apiService.solicitarAlquiler(property.id, {
         mensaje: mensajeAlquiler.trim() || undefined,
         telefono_contacto: telefonoAlquiler.trim(),
+        habitacion_id: property.alquila_por_habitaciones ? Number(habitacionSeleccionada) : undefined,
       })
       toast.success("Solicitud enviada. El propietario será notificado")
       setModalAlquilerAbierto(false)
       setMensajeAlquiler("")
       setTelefonoAlquiler("")
+      setHabitacionSeleccionada("")
       setYaSolicito(true)
     } catch (error) {
       console.error("Error solicitando alquiler:", error)
@@ -1955,6 +1974,54 @@ export default function PropertyDetailPage() {
               )}
 
               <form onSubmit={handleSolicitarAlquiler} className="space-y-4">
+                {/* Alquiler por habitaciones: elegir habitación */}
+                {property?.alquila_por_habitaciones && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Elige la habitación *
+                      <span className="ml-2 text-xs text-gray-400">
+                        {(property.habitaciones || []).filter((h) => h.disponible).length} de {(property.habitaciones || []).length} disponibles
+                      </span>
+                    </label>
+                    {(() => {
+                      const libres = (property.habitaciones || []).filter((h) => h.disponible)
+                      if (libres.length === 0) {
+                        return <p className="text-sm text-red-500">No hay habitaciones disponibles</p>
+                      }
+                      return (
+                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                          {libres.map((h) => (
+                            <label
+                              key={h.id}
+                              className={`flex items-center justify-between gap-2 rounded-lg border-2 px-3 py-2 cursor-pointer transition-colors ${
+                                habitacionSeleccionada === String(h.id)
+                                  ? "border-indigo-500 bg-indigo-50"
+                                  : "border-gray-200 hover:border-indigo-300"
+                              }`}
+                            >
+                              <span className="flex items-center gap-2 min-w-0">
+                                <input
+                                  type="radio"
+                                  name="habitacion"
+                                  checked={habitacionSeleccionada === String(h.id)}
+                                  onChange={() => setHabitacionSeleccionada(String(h.id))}
+                                  className="text-indigo-600"
+                                />
+                                <span className="text-sm font-medium text-gray-800 truncate">{h.nombre}</span>
+                              </span>
+                              <span className="text-xs text-gray-500 shrink-0">
+                                {h.precio != null && h.precio > 0
+                                  ? `${property.moneda === 'USD' ? '$' : 'Bs'} ${h.precio.toLocaleString()}/mes`
+                                  : `${property.moneda === 'USD' ? '$' : 'Bs'} ${property.precio.toLocaleString()}/mes`}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Tu teléfono de contacto *

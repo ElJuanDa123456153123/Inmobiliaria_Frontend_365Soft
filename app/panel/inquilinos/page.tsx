@@ -8,6 +8,16 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog"
 import { apiService, TenantSummary, RentPayment } from "@/lib/services/api"
 import { getImageUrl } from "@/lib/utils"
 import { toast } from "sonner"
@@ -66,7 +76,7 @@ export default function InquilinosPanelPage() {
       .filter((i) => {
         if (!q) return true
         const nombre = nombreInquilino(i).toLowerCase()
-        const propiedad = (i.property?.titulo || "").toLowerCase()
+        const propiedad = ((i.property?.titulo || "") + " " + (i.habitacion?.nombre || "")).toLowerCase()
         const email = (i.inquilino?.email || "").toLowerCase()
         return nombre.includes(q) || propiedad.includes(q) || email.includes(q)
       })
@@ -174,8 +184,13 @@ export default function InquilinosPanelPage() {
     return `${MESES_COMPLETOS[pago.mes_correspondiente - 1] || "?"} ${pago.anio}`
   }
 
-  const finalizarContrato = async (contrato: TenantSummary) => {
-    if (!confirm("¿Finalizar este contrato? Se registrará la devolución del anticrés/depósito para que el inquilino la confirme.")) return
+  // Modal de confirmación para finalizar contrato
+  const [pendienteFinalizar, setPendienteFinalizar] = useState<TenantSummary | null>(null)
+
+  const confirmarFinalizar = async () => {
+    if (!pendienteFinalizar) return
+    const contrato = pendienteFinalizar
+    setPendienteFinalizar(null)
     setProcesando(contrato.id)
     try {
       await apiService.terminarContrato(contrato.id)
@@ -189,7 +204,6 @@ export default function InquilinosPanelPage() {
     }
   }
 
-  // Iniciales para el avatar
   const iniciales = (i: TenantSummary) =>
     nombreInquilino(i).split(" ").map((p) => p.charAt(0)).slice(0, 2).join("").toUpperCase()
 
@@ -271,7 +285,10 @@ export default function InquilinosPanelPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{nombreInquilino(i)}</p>
-                        <p className="text-xs text-gray-500 truncate">{i.property?.titulo}</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {i.property?.titulo}
+                          {i.habitacion && ` · 🛏️ ${i.habitacion.nombre}`}
+                        </p>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         {alerta ? (
@@ -314,6 +331,7 @@ export default function InquilinosPanelPage() {
                       <h2 className="font-semibold text-gray-900 truncate">{nombreInquilino(actual)}</h2>
                       {getEstadoContratoBadge(actual.estado)}
                       {actual.tipo_contrato === "anticretico" && <Badge className="bg-indigo-600">Anticrético</Badge>}
+                      {actual.habitacion && <Badge className="bg-purple-600">🛏️ {actual.habitacion.nombre}</Badge>}
                     </div>
                     <p className="text-sm text-gray-600 truncate mt-0.5">{actual.property?.titulo}</p>
                     <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-gray-500">
@@ -379,7 +397,7 @@ export default function InquilinosPanelPage() {
                       size="sm"
                       className="text-orange-600 hover:bg-orange-50"
                       disabled={procesando === actual.id}
-                      onClick={() => finalizarContrato(actual)}
+                      onClick={() => setPendienteFinalizar(actual)}
                     >
                       {procesando === actual.id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -545,6 +563,24 @@ export default function InquilinosPanelPage() {
           )}
         </div>
       )}
+      {/* Confirmación: finalizar contrato */}
+      <AlertDialog open={!!pendienteFinalizar} onOpenChange={(open) => !open && setPendienteFinalizar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Finalizar el contrato de {pendienteFinalizar ? nombreInquilino(pendienteFinalizar) : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se registrará la devolución del depósito/anticrés y el inquilino deberá confirmar su recepción.
+              La propiedad volverá a estar disponible para nuevos alquileres. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction className="bg-orange-600 hover:bg-orange-700" onClick={confirmarFinalizar}>
+              Sí, finalizar contrato
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

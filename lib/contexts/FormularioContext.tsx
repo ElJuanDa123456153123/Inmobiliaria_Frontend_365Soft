@@ -29,6 +29,9 @@ interface DatosOperacion {
   deposito?: string  // Ej: "1 mes", "2 meses"
   plazoMinimo?: string  // Ej: "6 meses", "1 año"
   serviciosIncluidos?: string[]  // ["luz", "agua", "internet"]
+  // Alquiler por habitaciones
+  alquilaPorHabitaciones?: boolean
+  habitaciones?: Array<{ nombre: string; descripcion?: string; precio?: string; activa?: boolean }>
   // Campos específicos para anticrético
   duracionContrato?: string  // Ej: "1 año", "2 años"
   opcionCompra?: boolean  // Opción de compra

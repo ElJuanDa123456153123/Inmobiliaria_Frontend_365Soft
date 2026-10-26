@@ -101,6 +101,10 @@ interface CreatePropertyRequest {
   // === DESCRIPCIÓN (PASO 6) ===
   descripcion: string
   terminos_condiciones: string
+
+  // === ALQUILER POR HABITACIONES ===
+  alquila_por_habitaciones?: boolean
+  habitaciones?: Array<{ nombre: string; descripcion?: string; precio?: number | null; activa?: boolean }>
 }
 
 interface Property {
@@ -139,6 +143,9 @@ interface Property {
   estado_propiedad: string
   destacado: boolean
   alquilada: boolean
+  // Alquiler por habitaciones
+  alquila_por_habitaciones?: boolean
+  habitaciones?: Habitacion[]
   // Campos específicos de alquiler
   deposito?: string
   plazo_minimo?: string
@@ -843,7 +850,7 @@ class ApiService {
   // === ALQUILER: SOLICITUDES, CONTRATOS Y CUOTAS ===
 
   // Interesado: solicitar alquilar una propiedad
-  async solicitarAlquiler(propertyId: number, data: { mensaje?: string; telefono_contacto?: string }): Promise<{ message: string; solicitud: RentalRequest }> {
+  async solicitarAlquiler(propertyId: number, data: { mensaje?: string; telefono_contacto?: string; habitacion_id?: number }): Promise<{ message: string; solicitud: RentalRequest }> {
     const response = await fetch(`${getApiUrl()}/api/properties/${propertyId}/rental-request`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1088,11 +1095,25 @@ interface UploadDocumentRequest {
 
 // === ALQUILER ===
 
+// Habitación de una propiedad alquilada por habitaciones
+export interface Habitacion {
+  id: number
+  property_id: number
+  nombre: string
+  descripcion?: string
+  precio?: number | null
+  activa: boolean
+  disponible?: boolean
+  contrato_activo_id?: number | null
+}
+
 export interface RentalRequest {
   id: number
   property_id: number
   inquilino_id: number
   vendedor_id: number
+  habitacion_id?: number
+  habitacion?: Habitacion
   mensaje?: string
   telefono_contacto?: string
   estado: 'pendiente' | 'aceptada' | 'rechazada' | 'cancelada'
@@ -1114,6 +1135,8 @@ export interface RentalContract {
   property_id: number
   inquilino_id: number
   vendedor_id: number
+  habitacion_id?: number
+  habitacion?: Habitacion
   fecha_inicio: string
   fecha_fin: string
   monto_mensual: number

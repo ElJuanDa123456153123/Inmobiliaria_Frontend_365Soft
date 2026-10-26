@@ -40,7 +40,10 @@ export default function SolicitudesPanelPage() {
   }, [fetchSolicitudes])
 
   const abrirAceptar = (solicitud: RentalRequest) => {
-    const precio = solicitud.property?.precio || 0
+    // Si la solicitud es por una habitación, usar su precio (o el general como fallback)
+    const precio = solicitud.habitacion?.precio != null && solicitud.habitacion.precio > 0
+      ? solicitud.habitacion.precio
+      : (solicitud.property?.precio || 0)
     setSolicitudAAceptar(solicitud)
     setMontoMensual(precio > 0 ? String(precio) : "")
     // Fechas por defecto: de hoy a 1 año (o según duración publicada en anticrético)
@@ -198,6 +201,14 @@ export default function SolicitudesPanelPage() {
                       <h3 className="font-semibold text-gray-900 truncate">
                         {solicitud.property?.titulo}
                       </h3>
+                      {solicitud.habitacion && (
+                        <p className="text-xs font-medium text-indigo-600 mt-0.5">
+                          🛏️ Habitación: {solicitud.habitacion.nombre}
+                          {solicitud.habitacion.precio != null && solicitud.habitacion.precio > 0 && (
+                            <span className="text-gray-400"> · Bs. {solicitud.habitacion.precio.toLocaleString()}/mes</span>
+                          )}
+                        </p>
+                      )}
                     </div>
                     {getEstadoBadge(solicitud.estado)}
                   </div>
@@ -292,6 +303,14 @@ export default function SolicitudesPanelPage() {
                 </strong>
                 <br />
                 Propiedad: <strong>{solicitudAAceptar.property?.titulo}</strong>
+              {solicitudAAceptar.habitacion && (
+                <span className="block">
+                  Habitación: <strong>{solicitudAAceptar.habitacion.nombre}</strong>
+                  {solicitudAAceptar.habitacion.precio != null && solicitudAAceptar.habitacion.precio > 0 && (
+                    <span className="text-gray-400"> (precio publicado: Bs. {solicitudAAceptar.habitacion.precio.toLocaleString()}/mes)</span>
+                  )}
+                </span>
+              )}
                 {esAnticretico ? (
                   solicitudAAceptar.property?.duracion_contrato && (
                     <span className="block text-xs mt-1">

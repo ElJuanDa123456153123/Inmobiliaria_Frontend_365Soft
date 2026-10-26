@@ -20,6 +20,16 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import Link from "next/link"
 import { DisponibilidadVisitasCard } from "@/components/panel/disponibilidad-visitas"
@@ -104,6 +114,12 @@ export default function PanelVisitasPage() {
 
   // Configuración de disponibilidad (horarios en que el vendedor recibe visitas)
   const [mostrarDisponibilidad, setMostrarDisponibilidad] = useState(false)
+
+  // Confirmación antes de ejecutar acciones críticas
+  const [pendienteConfirmar, setPendienteConfirmar] = useState<{
+    tipo: "confirmar" | "rechazar" | "cancelar" | "realizada"
+    visit: Visit
+  } | null>(null)
 
   useEffect(() => {
     const tabParam = searchParams.get("tab")
@@ -297,6 +313,59 @@ export default function PanelVisitasPage() {
     setVisitaAReprogramar(null)
   }
 
+  // Ejecutar la acción que el usuario confirmó en el modal
+  const ejecutarPendiente = () => {
+    if (!pendienteConfirmar) return
+    const { tipo, visit } = pendienteConfirmar
+    if (tipo === "confirmar") handleConfirmar(visit)
+    else if (tipo === "realizada") updateVisitStatus(visit.id, "completada")
+    else updateVisitStatus(visit.id, "cancelada")
+    setPendienteConfirmar(null)
+  }
+
+  // Textos del modal de confirmación según la acción
+  const configConfirmacion = () => {
+    if (!pendienteConfirmar) return null
+    const { tipo, visit } = pendienteConfirmar
+    const nombre = (activeTab === "mias" ? visit.vendedor?.nombre : visit.inquilino?.nombre) || "el interesado"
+    const fechaTxt = tieneFechaValida(visit)
+      ? parseFechaVisita(visit.fecha_visita).toLocaleString("es-BO", {
+          weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+        })
+      : "sin fecha asignada"
+
+    switch (tipo) {
+      case "confirmar":
+        return {
+          titulo: "¿Confirmar esta visita?",
+          descripcion: `${nombre} · ${fechaTxt}. El cliente recibirá la confirmación por correo y quedará agendado en tu agenda.`,
+          boton: "Sí, confirmar",
+          clase: "bg-green-600 hover:bg-green-700",
+        }
+      case "rechazar":
+        return {
+          titulo: "¿Rechazar esta solicitud?",
+          descripcion: `La solicitud de ${nombre} (${fechaTxt}) será cancelada. El cliente será notificado y podrá agendar otro horario.`,
+          boton: "Sí, rechazar",
+          clase: "bg-red-600 hover:bg-red-700",
+        }
+      case "cancelar":
+        return {
+          titulo: "¿Cancelar esta visita?",
+          descripcion: `La visita con ${nombre} (${fechaTxt}) quedará cancelada y se avisará al interesado. Esta acción no se puede deshacer.`,
+          boton: "Sí, cancelar visita",
+          clase: "bg-red-600 hover:bg-red-700",
+        }
+      case "realizada":
+        return {
+          titulo: "¿Marcar como realizada?",
+          descripcion: `La visita de ${nombre} (${fechaTxt}) pasará al historial como completada.`,
+          boton: "Sí, fue realizada",
+          clase: "bg-green-600 hover:bg-green-700",
+        }
+    }
+  }
+
   // Guardar la nueva fecha: reprogramar (queda pendiente) o confirmar directo
   const handleGuardarFecha = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -450,7 +519,7 @@ export default function PanelVisitasPage() {
                     <Button
                       size="sm"
                       disabled={accionEnCurso === visit.id}
-                      onClick={() => handleConfirmar(visit)}
+                      onClick={() => setPendienteConfirmar({ tipo: "confirmar", visit })}
                       className="bg-green-600 hover:bg-green-700 h-8"
                     >
                       <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
@@ -461,7 +530,7 @@ export default function PanelVisitasPage() {
                     <Button
                       size="sm"
                       disabled={accionEnCurso === visit.id}
-                      onClick={() => updateVisitStatus(visit.id, "completada")}
+                      onClick={() => setPendienteConfirmar({ tipo: "realizada", visit })}
                       className="bg-green-600 hover:bg-green-700 h-8"
                     >
                       <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
@@ -474,7 +543,7 @@ export default function PanelVisitasPage() {
                   <Button
                     size="sm"
                     disabled={accionEnCurso === visit.id}
-                    onClick={() => updateVisitStatus(visit.id, "completada")}
+                    onClick={() => setPendienteConfirmar({ tipo: "realizada", visit })}
                     className="bg-green-600 hover:bg-green-700 h-8"
                   >
                     <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
@@ -502,7 +571,7 @@ export default function PanelVisitasPage() {
                     size="sm"
                     variant="outline"
                     disabled={accionEnCurso === visit.id}
-                    onClick={() => updateVisitStatus(visit.id, "cancelada")}
+                    onClick={() => setPendienteConfirmar({ tipo: "rechazar", visit })}
                     title="Rechazar solicitud"
                     className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                   >
@@ -513,7 +582,7 @@ export default function PanelVisitasPage() {
                     size="sm"
                     variant="outline"
                     disabled={accionEnCurso === visit.id}
-                    onClick={() => updateVisitStatus(visit.id, "cancelada")}
+                    onClick={() => setPendienteConfirmar({ tipo: "cancelar", visit })}
                     title="Cancelar visita"
                     className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                   >
@@ -650,6 +719,25 @@ export default function PanelVisitasPage() {
           {filteredVisits.map((visit) => <FilaVisita key={visit.id} visit={visit} />)}
         </div>
       )}
+
+      {/* Confirmación de acciones críticas */}
+      <AlertDialog open={!!pendienteConfirmar} onOpenChange={(open) => !open && setPendienteConfirmar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{configConfirmacion()?.titulo}</AlertDialogTitle>
+            <AlertDialogDescription>{configConfirmacion()?.descripcion}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              className={configConfirmacion()?.clase}
+              onClick={ejecutarPendiente}
+            >
+              {configConfirmacion()?.boton}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal: reprogramar / asignar fecha (vendedor) */}
       {modalFechaAbierto && visitaAReprogramar && (
