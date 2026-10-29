@@ -102,7 +102,15 @@ export function FormularioContent() {
   useEffect(() => {
     if (!isInitialized) return
     const editParam = new URLSearchParams(window.location.search).get('edit')
-    if (!editParam) return
+
+    // Sin ?edit = nueva publicación. Si el borrador guardado era de una
+    // EDICIÓN anterior, limpiarlo para no arrastrar datos de esa propiedad.
+    if (!editParam) {
+      if (editPropertyId !== null) {
+        resetFormulario()
+      }
+      return
+    }
 
     const id = parseInt(editParam)
     if (isNaN(id)) return
@@ -299,10 +307,20 @@ export function FormularioContent() {
 
   const validarPasoActual = () => {
     switch (pasoActual) {
-      case 1:
-        return datosOperacion.titulo.length >= 10 &&
-               datosOperacion.tipoOperacion &&
-               datosOperacion.precio
+      case 1: {
+        if (datosOperacion.titulo.length < 10 || !datosOperacion.tipoOperacion) return false
+
+        // Modo "por habitaciones": el precio general se autocalcula con el
+        // mínimo de las habitaciones. Se exige al menos 1 habitación con
+        // nombre y precio definido.
+        if (datosOperacion.tipoOperacion === 'alquiler' && datosOperacion.alquilaPorHabitaciones) {
+          const habs = (datosOperacion.habitaciones || []).filter((h) => (h.nombre || '').trim())
+          if (habs.length === 0) return false
+          return habs.some((h) => parseFloat(h.precio || '') > 0)
+        }
+
+        return Boolean(datosOperacion.precio)
+      }
       case 2:
         return datosGenerales.tipoPropiedad &&
                datosGenerales.zona.length >= 3

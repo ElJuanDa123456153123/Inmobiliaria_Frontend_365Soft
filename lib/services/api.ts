@@ -312,6 +312,41 @@ class ApiService {
     return this.handleResponse(response)
   }
 
+  // === HABITACIONES (alquiler por habitaciones, panel del propietario) ===
+
+  async getHabitaciones(propertyId: number): Promise<{ habitaciones: Habitacion[]; total: number; disponibles: number }> {
+    const response = await fetch(`${getApiUrl()}/api/panel/properties/${propertyId}/habitaciones`, {
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
+  async createHabitacion(propertyId: number, data: { nombre: string; descripcion?: string; precio?: number | null; activa?: boolean }): Promise<{ message: string; habitacion: Habitacion }> {
+    const response = await fetch(`${getApiUrl()}/api/panel/properties/${propertyId}/habitaciones`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+    return this.handleResponse(response)
+  }
+
+  async updateHabitacion(propertyId: number, habitacionId: number, data: { nombre: string; descripcion?: string; precio?: number | null; activa?: boolean }): Promise<{ message: string; habitacion: Habitacion }> {
+    const response = await fetch(`${getApiUrl()}/api/panel/properties/${propertyId}/habitaciones/${habitacionId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+    return this.handleResponse(response)
+  }
+
+  async deleteHabitacion(propertyId: number, habitacionId: number): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/panel/properties/${propertyId}/habitaciones/${habitacionId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
   // Guardar la lista de QRs de cobro por plataforma (Yape, Plin, BNB...)
   async actualizarQrsCobro(qrs: { plataforma: string; url: string }[]): Promise<{ message: string; qrs_cobro: { plataforma: string; url: string }[] }> {
     const response = await fetch(`${getApiUrl()}/api/auth/qrs-cobro`, {
